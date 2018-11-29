@@ -1,6 +1,8 @@
 // ==UserScript==
 // @name         Krunker.io Map Editor Mod
 // @description  Krunker.io Map Editor Mod
+// @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
+// @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @version      0.1
 // @author       Tehchy
 // @match        https://krunker.io/editor.html
