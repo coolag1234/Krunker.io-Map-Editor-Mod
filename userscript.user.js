@@ -3,7 +3,7 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      0.3
+// @version      0.4
 // @author       Tehchy
 // @match        https://krunker.io/editor.html
 // @require      https://raw.githubusercontent.com/Tehchy/Krunker.io-Map-Editor-Mod/master/prefabs.js
@@ -23,6 +23,8 @@ class Mod {
             three: null
         }
         this.copy = null
+        this.rotation = 0
+        this.prefabMenu = null
         this.onLoad()
     }
 
@@ -43,16 +45,51 @@ class Mod {
             let jsp = JSON.parse(str);
             jsp = jsp.objects ? jsp.objects : jsp
             for (let ob of jsp) {
+               if (this.rotation > 0) {
+                    ob = this.rotateObject(ob, this.rotation)
+                }
                 ob.p[0] += selected.userData.owner.position.x
                 ob.p[1] += selected.userData.owner.position.y
                 ob.p[2] += selected.userData.owner.position.z
                 this.hooks.config.addObject(this.hooks.object.deserialize(ob))
             }
+            this.rotation = 0
+            this.prefabMenu.__controllers[0].setValue(this.rotation)
         } else {
             alert("You must select a object first")
         }
     }
-   
+    
+    rotateObject(ob, rotation = 90) {
+        switch (rotation) {
+            case 90: return this.changeAngle(ob)
+            case 180: return this.reflectAngle(ob)
+            case 270: return this.reflectAngle(this.changeAngle(ob))
+            default: return ob
+        }
+    }
+    
+    changeAngle(ob){
+        //Credit JustProb
+        var x = ob.s[0]
+        var y = ob.s[2]
+        ob.s[0] = y
+        ob.s[2] = x
+        var a = ob.p[0]
+        var b = ob.p[2]
+        ob.p[0] = b
+        ob.p[2] = a
+        
+        return ob
+    }
+
+    reflectAngle(ob){
+        //Credit JustProb
+        ob.p[0] = -1 * ob.p[0]
+        ob.p[2] = -1 * ob.p[2]
+        
+        return ob
+    }
     
     copyObjects(cut = false) {
         let selected = this.objectSelected()
@@ -145,12 +182,15 @@ class Mod {
     }
 
     setupMenu() {
-        let n = this.hooks.gui.addFolder("Prefabs");
-        let createObjects = {}
+        this.prefabMenu = this.hooks.gui.addFolder("Prefabs");
+        let createObjects = {
+            rotation: 0
+        }
         let prefabs = localStorage.getItem('krunk_prefabs') ? JSON.parse(localStorage.getItem('krunk_prefabs')) : {}
+        this.prefabMenu.add(createObjects, "rotation", 0, 270, 90).name("Rotation").onChange(t => {this.rotation = t})               
         for (let ob in prefabs) {
             createObjects[ob] = (() => this.replaceObject(JSON.stringify(prefabs[ob])))
-            n.add(createObjects, ob).name(ob)
+            this.prefabMenu.add(createObjects, ob).name(ob)
         }
     }
     
