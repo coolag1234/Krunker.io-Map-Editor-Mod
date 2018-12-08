@@ -3,7 +3,7 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      0.2
+// @version      0.3
 // @author       Tehchy
 // @match        https://krunker.io/editor.html
 // @require      https://raw.githubusercontent.com/Tehchy/Krunker.io-Map-Editor-Mod/master/prefabs.js
@@ -19,7 +19,8 @@ class Mod {
         this.hooks = {
             object: null,
             config: null,
-            gui: null
+            gui: null,
+            three: null
         }
         this.copy = null
         this.onLoad()
@@ -64,6 +65,7 @@ class Mod {
             maxZ: selected.position.z + (selected.scale.z / 2), 
         }
         var intersect = []
+        var obbys = []
         for (var i = 0; i < this.hooks.config.objInstances.length; i++) {
             if (this.hooks.config.objInstances[i].uuid == selected.uuid) continue
             var ob = this.hooks.config.objInstances[i].boundingMesh
@@ -75,8 +77,13 @@ class Mod {
                     maxY: ob.position.y + ob.scale.y, 
                     maxZ: ob.position.z + (ob.scale.z / 2)
                 }, pos)) {
+                obbys.push(this.hooks.config.objInstances[i])
                 intersect.push(this.hooks.config.objInstances[i].serialize())
-                if (cut) this.hooks.config.removeObject(this.hooks.config.objInstances[i])
+            }
+        }
+        if (cut && obbys.length ) {
+            for (var i = 0; i < obbys.length; i++) {
+                this.hooks.config.removeObject(obbys[i])
             }
         }
         this.copy = JSON.stringify(intersect)
@@ -174,6 +181,7 @@ GM_xmlhttpRequest({
             .replace(/(\w+).boundingNoncollidableBoxMaterial=new (.*)}\);const/, '$1.boundingNoncollidableBoxMaterial = new $2 });window.mod.hooks.object = $1;const')
             .replace(/(\w+).init\(document.getElementById\("container"\)\)/, '$1.init(document.getElementById("container")), window.mod.hooks.config = $1')
             .replace(/\[\],(\w+).open\(\),/, '[],$1.open(),window.mod.hooks.gui=$1,window.mod.setupMenu(),')
+            .replace(/initScene\(\){this\.scene=new (\w+).Scene,/, 'initScene(){this.scene=new $1.Scene,window.mod.hooks.three = $1,')
 
         GM_xmlhttpRequest({
             method: "GET",
