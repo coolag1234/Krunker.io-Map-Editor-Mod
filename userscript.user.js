@@ -3,7 +3,7 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      0.4
+// @version      0.5
 // @author       Tehchy
 // @match        https://krunker.io/editor.html
 // @require      https://raw.githubusercontent.com/Tehchy/Krunker.io-Map-Editor-Mod/master/prefabs.js
@@ -49,7 +49,7 @@ class Mod {
                     ob = this.rotateObject(ob, this.rotation)
                 }
                 ob.p[0] += selected.userData.owner.position.x
-                ob.p[1] += selected.userData.owner.position.y
+                ob.p[1] += selected.userData.owner.position.y - (selected.scale.y / 2)
                 ob.p[2] += selected.userData.owner.position.z
                 this.hooks.config.addObject(this.hooks.object.deserialize(ob))
             }
@@ -219,7 +219,8 @@ GM_xmlhttpRequest({
             .replace('("Light Color").listen().onChange', '("Light Color").onChange')
             .replace('("Fog Color").listen().onChange', '("Fog Color").onChange')
             .replace(/(\w+).boundingNoncollidableBoxMaterial=new (.*)}\);const/, '$1.boundingNoncollidableBoxMaterial = new $2 });window.mod.hooks.object = $1;const')
-            .replace(/(\w+).init\(document.getElementById\("container"\)\)/, '$1.init(document.getElementById("container")), window.mod.hooks.config = $1')
+            //.replace(/(\w+).init\(document.getElementById\("container"\)\)/, '$1.init(document.getElementById("container")), window.mod.hooks.config = $1')
+            .replace(/this\.transformControl\.update\(\)/, 'this.transformControl.update(),window.mod.hooks.config = this')
             .replace(/\[\],(\w+).open\(\),/, '[],$1.open(),window.mod.hooks.gui=$1,window.mod.setupMenu(),')
             .replace(/initScene\(\){this\.scene=new (\w+).Scene,/, 'initScene(){this.scene=new $1.Scene,window.mod.hooks.three = $1,')
 
