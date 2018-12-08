@@ -6,7 +6,7 @@
 // @version      0.5
 // @author       Tehchy
 // @match        https://krunker.io/editor.html
-// @require      https://raw.githubusercontent.com/Tehchy/Krunker.io-Map-Editor-Mod/master/prefabs.js
+// @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/prefabs.js
 // @grant        GM_xmlhttpRequest
 // @run-at       document-start
 // ==/UserScript==
@@ -188,9 +188,12 @@ class Mod {
         }
         let prefabs = localStorage.getItem('krunk_prefabs') ? JSON.parse(localStorage.getItem('krunk_prefabs')) : {}
         this.prefabMenu.add(createObjects, "rotation", 0, 270, 90).name("Rotation").onChange(t => {this.rotation = t})               
-        for (let ob in prefabs) {
-            createObjects[ob] = (() => this.replaceObject(JSON.stringify(prefabs[ob])))
-            this.prefabMenu.add(createObjects, ob).name(ob)
+        for (let cat in prefabs) {
+            var category = this.prefabMenu.addFolder(cat)
+            for (let ob in prefabs[cat]) {
+                createObjects[ob] = (() => this.replaceObject(JSON.stringify(prefabs[cat][ob])))
+                category.add(createObjects, ob).name(ob)
+            }
         }
     }
     
