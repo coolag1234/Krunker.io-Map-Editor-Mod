@@ -3,7 +3,7 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      0.6
+// @version      0.7
 // @author       Tehchy
 // @match        https://krunker.io/editor.html
 // @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/prefabs.js
@@ -44,13 +44,15 @@ class Mod {
             
             let jsp = JSON.parse(str);
             jsp = jsp.objects ? jsp.objects : jsp
+            let sub = [jsp[0].p[0], jsp[0].p[1], jsp[0].p[2]]
             for (let ob of jsp) {
                if (this.rotation > 0) {
                     ob = this.rotateObject(ob, this.rotation)
                 }
-                ob.p[0] += selected.userData.owner.position.x
-                ob.p[1] += selected.userData.owner.position.y - (selected.scale.y / 2)
-                ob.p[2] += selected.userData.owner.position.z
+                
+                ob.p[0] += selected.userData.owner.position.x - sub[0]
+                ob.p[1] += selected.userData.owner.position.y - (selected.scale.y / 2) - sub[1]
+                ob.p[2] += selected.userData.owner.position.z - sub[2]
                 this.hooks.config.addObject(this.hooks.object.deserialize(ob))
             }
             this.rotation = 0
