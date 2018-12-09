@@ -3,7 +3,7 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      0.8
+// @version      0.9
 // @author       Tehchy
 // @match        https://krunker.io/editor.html
 // @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/prefabs.js
@@ -47,15 +47,15 @@ class Mod {
             
             let jsp = JSON.parse(str);
             jsp = jsp.objects ? jsp.objects : jsp
-            let sub = [jsp[0].p[0], jsp[0].p[1], jsp[0].p[2]]
+            let center = this.findCenter(jsp)
             for (let ob of jsp) {
-               if (this.rotation > 0) {
+                if (this.rotation > 0) {
                     ob = this.rotateObject(ob, this.rotation)
                 }
                 
-                ob.p[0] += selected.userData.owner.position.x - sub[0]
-                ob.p[1] += selected.userData.owner.position.y - (selected.scale.y / 2) - sub[1]
-                ob.p[2] += selected.userData.owner.position.z - sub[2]
+                ob.p[0] += selected.userData.owner.position.x - center[0]
+                ob.p[1] += selected.userData.owner.position.y - (selected.scale.y / 2) - center[1]
+                ob.p[2] += selected.userData.owner.position.z - center[2]
                 this.hooks.config.addObject(this.hooks.object.deserialize(ob))
             }
             this.rotation = 0
@@ -96,6 +96,27 @@ class Mod {
         return ob
     }
     
+    findCenter(item) {
+        //Credit JustProb
+        var min = item[0].p[1],
+        xMin = item[0].p[0] - (item[0].s[0] /2),
+        xMax = item[0].p[0] + (item[0].s[0] /2),
+        yMin = item[0].p[2] - (item[0].s[2] /2),
+        yMax = item[0].p[2] + (item[0].s[2] /2)
+
+
+        for (var index in item) {
+            var object = item[index]
+            if (object.p[1]  < min) min = object.p[1]
+            if (object.p[0] - (object.s[0] /2) < xMin) xMin = object.p[0] - (object.s[0] /2)
+            if (object.p[0] + (object.s[0] /2) > xMax) xMax = object.p[0] + (object.s[0] /2)
+            if (object.p[2] - (object.s[2] /2) < yMin) yMin = object.p[2] - (object.s[2] /2)
+            if (object.p[2] + (object.s[2] /2) > yMax) yMax = object.p[2] + (object.s[2] /2)
+        }
+
+        return [(xMin + xMax)/2, min, (yMin + yMax)/2]
+    }
+    
     copyObjects(cut = false) {
         let selected = this.objectSelected()
         var pos = {
@@ -130,6 +151,15 @@ class Mod {
         }
         this.copy = JSON.stringify(intersect)
     }
+    
+    spawnPlaceholder() {
+        let pos = this.hooks.config.camera.getWorldPosition()
+        let obph = {p: [], s: [10, 10, 10]}
+        obph.p[0] = pos.x
+        obph.p[1] = pos.y - 10
+        obph.p[2] = pos.z
+        this.hooks.config.addObject(this.hooks.object.deserialize(obph))
+    }
         
     intersect(a, b) {
         return (a.minX <= b.maxX && a.maxX >= b.minX) &&
@@ -138,7 +168,7 @@ class Mod {
     }
 
     addButtons() {
-        document.getElementById("bottomBar").insertAdjacentHTML('beforeend', '<div class="bottomPanel"><div id="copyObjects" class="bottomButton">Copy Objects</div><div id="cutObjects" class="bottomButton">Cut Objects</div><div id="pasteObjects" class="bottomButton">Paste Objects</div><div id="saveObjects" class="bottomButton">Save Objects</div></div>');
+        document.getElementById("bottomBar").insertAdjacentHTML('beforeend', '<div class="bottomPanel"><div id="copyObjects" class="bottomButton">Copy Objects</div><div id="cutObjects" class="bottomButton">Cut Objects</div><div id="pasteObjects" class="bottomButton">Paste Objects</div><div id="saveObjects" class="bottomButton">Save Objects</div></div><div class="bottomPanel"><div id="spawnPlaceholder" class="bottomButton">Spawn Placeholder</div></div>');
         document.getElementById("copyObjects").addEventListener("click", t => {  
             let selected = this.objectSelected()
             if (!selected){
@@ -177,6 +207,9 @@ class Mod {
             this.download(this.copy, 'prefab_' + nme.replace(/ /g,"_") + '.txt', 'text/plain');
         })
         
+        document.getElementById("spawnPlaceholder").addEventListener("click", t => {  
+            this.spawnPlaceholder()
+        })
         document.getElementById("deleteObject").insertAdjacentHTML('beforebegin', '<div id="replaceObject" class="bottomButton">Replace Object</div>');
         document.getElementById("replaceObject").addEventListener("click", t => {
             var json = prompt("Import Object Json", "");
