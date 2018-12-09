@@ -3,7 +3,7 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      0.7
+// @version      0.8
 // @author       Tehchy
 // @match        https://krunker.io/editor.html
 // @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/prefabs.js
@@ -21,6 +21,9 @@ class Mod {
             config: null,
             gui: null,
             three: null
+        }
+        this.settings = {
+            degToRad: false /// Change to true JustProb <3
         }
         this.copy = null
         this.rotation = 0
@@ -207,6 +210,15 @@ class Mod {
         a.download = fileName;
         a.click();
     }
+    
+    degToRad(r) {
+        if (!this.settings.degToRad) return r
+        return [
+            this.hooks.three.Math.degToRad(r[0]),
+            this.hooks.three.Math.degToRad(r[1]),
+            this.hooks.three.Math.degToRad(r[2]),
+        ]
+    }
 
     onLoad() {
         this.addButtons()
@@ -228,6 +240,7 @@ GM_xmlhttpRequest({
             .replace(/this\.transformControl\.update\(\)/, 'this.transformControl.update(),window.mod.hooks.config = this')
             .replace(/\[\],(\w+).open\(\),/, '[],$1.open(),window.mod.hooks.gui=$1,window.mod.setupMenu(),')
             .replace(/initScene\(\){this\.scene=new (\w+).Scene,/, 'initScene(){this.scene=new $1.Scene,window.mod.hooks.three = $1,')
+            .replace(/{(\w+)\[(\w+)\]\=(\w+)}\);this\.objConfigOptions/, '{$1[$2]=$2 == "rot" ? window.mod.degToRad($3) : $3});this.objConfigOptions')
 
         GM_xmlhttpRequest({
             method: "GET",
