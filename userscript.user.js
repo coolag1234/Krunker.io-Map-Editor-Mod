@@ -36,6 +36,11 @@ class Mod {
         let selected = this.hooks.config.transformControl.object
         return selected ? selected : false
     }
+    
+    jsonInput() {
+        let json = prompt("Import Object Json", "");
+        if (json != null && json != "" && this.objectSelected()) this.replaceObject(json)
+    }
 
     replaceObject(str) {
         let selected = this.objectSelected()
@@ -77,12 +82,12 @@ class Mod {
     
     changeAngle(ob){
         //Credit JustProb
-        var x = ob.s[0]
-        var y = ob.s[2]
+        let x = ob.s[0],
+            y = ob.s[2]
         ob.s[0] = y
         ob.s[2] = x
-        var a = ob.p[0]
-        var b = ob.p[2]
+        let a = ob.p[0],
+            b = ob.p[2]
         ob.p[0] = b
         ob.p[2] = a
         
@@ -99,7 +104,7 @@ class Mod {
     
     findCenter(item) {
         //Credit JustProb
-        var min = item[0].p[1],
+        let min = item[0].p[1],
         xMin = item[0].p[0] - (item[0].s[0] /2),
         xMax = item[0].p[0] + (item[0].s[0] /2),
         yMin = item[0].p[2] - (item[0].s[2] /2),
@@ -107,7 +112,7 @@ class Mod {
 
 
         for (var index in item) {
-            var object = item[index]
+            let object = item[index]
             if (object.p[1]  < min) min = object.p[1]
             if (object.p[0] - (object.s[0] /2) < xMin) xMin = object.p[0] - (object.s[0] /2)
             if (object.p[0] + (object.s[0] /2) > xMax) xMax = object.p[0] + (object.s[0] /2)
@@ -120,7 +125,7 @@ class Mod {
     
     copyObjects(cut = false, group = false) {
         let selected = this.objectSelected()
-        var pos = {
+        let pos = {
             minX: selected.position.x - (selected.scale.x / 2), 
             minY: selected.position.y, 
             minZ: selected.position.z - (selected.scale.z / 2),  
@@ -128,11 +133,11 @@ class Mod {
             maxY: selected.position.y + selected.scale.y, 
             maxZ: selected.position.z + (selected.scale.z / 2), 
         }
-        var intersect = []
-        var obbys = []
+        let intersect = []
+        let obbys = []
         for (var i = 0; i < this.hooks.config.objInstances.length; i++) {
             if (this.hooks.config.objInstances[i].boundingMesh.uuid == selected.uuid) continue
-            var ob = this.hooks.config.objInstances[i].boundingMesh
+            let ob = this.hooks.config.objInstances[i].boundingMesh
             if (this.intersect({
                     minX: ob.position.x - (ob.scale.x / 2), 
                     minY: ob.position.y, 
@@ -188,7 +193,7 @@ class Mod {
     
     spawnPlaceholder() {
         let pos = this.hooks.config.camera.getWorldPosition()
-        let obph = {p: [], s: [10, 10, 10]}
+        let obph = {p: [], s: [10, 10, 10], e: 16777215, o: 0.3, c: 0}
         obph.p[0] = pos.x
         obph.p[1] = pos.y - 10
         obph.p[2] = pos.z
@@ -234,7 +239,7 @@ class Mod {
             if (!this.copy) {
                 return alert('Please copy objects first')
             }
-            var nme = prompt("Name your prefab", "");
+            let nme = prompt("Name your prefab", "");
             if (nme == null) {
                 return alert('Please name your prefab')
             }
@@ -260,13 +265,6 @@ class Mod {
         document.getElementById("spawnPlaceholder").addEventListener("click", t => {  
             this.spawnPlaceholder()
         })
-        document.getElementById("deleteObject").insertAdjacentHTML('beforebegin', '<div id="replaceObject" class="bottomButton">Replace Object</div>');
-        document.getElementById("replaceObject").addEventListener("click", t => {
-            var json = prompt("Import Object Json", "");
-            if (json != null && this.objectSelected()) {
-                this.replaceObject(json)
-            }
-        })
     }
 
     setupMenu() {
@@ -275,9 +273,12 @@ class Mod {
             rotation: 0
         }
         let prefabs = localStorage.getItem('krunk_prefabs') ? JSON.parse(localStorage.getItem('krunk_prefabs')) : {}
-        this.prefabMenu.add(createObjects, "rotation", 0, 270, 90).name("Rotation").onChange(t => {this.rotation = t})               
+        
+        createObjects['json'] = (() => this.jsonInput())
+        this.prefabMenu.add(createObjects, "json").name("Replace Object (w/ json)")
+        this.prefabMenu.add(createObjects, "rotation", 0, 270, 90).name("Rotation").onChange(t => {this.rotation = t})          
         for (let cat in prefabs) {
-            var category = this.prefabMenu.addFolder(cat)
+            let category = this.prefabMenu.addFolder(cat)
             for (let ob in prefabs[cat]) {
                 createObjects[ob] = (() => this.replaceObject(JSON.stringify(prefabs[cat][ob])))
                 category.add(createObjects, ob).name(ob)
@@ -287,8 +288,8 @@ class Mod {
     
     download(content, fileName, contentType) {
         //Credit to - https://stackoverflow.com/a/34156339
-        var a = document.createElement("a");
-        var file = new Blob([content], {type: contentType});
+        let a = document.createElement("a");
+        let file = new Blob([content], {type: contentType});
         a.href = URL.createObjectURL(file);
         a.download = fileName;
         a.click();
