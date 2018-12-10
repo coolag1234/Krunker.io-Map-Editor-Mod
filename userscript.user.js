@@ -3,7 +3,7 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      0.9
+// @version      1.0
 // @author       Tehchy
 // @match        https://krunker.io/editor.html
 // @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/prefabs.js
@@ -26,6 +26,7 @@ class Mod {
             degToRad: false /// Change to true JustProb <3
         }
         this.copy = null
+        this.group = null
         this.rotation = 0
         this.prefabMenu = null
         this.onLoad()
@@ -117,7 +118,7 @@ class Mod {
         return [(xMin + xMax)/2, min, (yMin + yMax)/2]
     }
     
-    copyObjects(cut = false) {
+    copyObjects(cut = false, group = false) {
         let selected = this.objectSelected()
         var pos = {
             minX: selected.position.x - (selected.scale.x / 2), 
@@ -130,7 +131,7 @@ class Mod {
         var intersect = []
         var obbys = []
         for (var i = 0; i < this.hooks.config.objInstances.length; i++) {
-            if (this.hooks.config.objInstances[i].uuid == selected.uuid) continue
+            if (this.hooks.config.objInstances[i].boundingMesh.uuid == selected.uuid) continue
             var ob = this.hooks.config.objInstances[i].boundingMesh
             if (this.intersect({
                     minX: ob.position.x - (ob.scale.x / 2), 
@@ -140,16 +141,49 @@ class Mod {
                     maxY: ob.position.y + ob.scale.y, 
                     maxZ: ob.position.z + (ob.scale.z / 2)
                 }, pos)) {
-                obbys.push(this.hooks.config.objInstances[i])
-                intersect.push(this.hooks.config.objInstances[i].serialize())
+                if (!group) obbys.push(this.hooks.config.objInstances[i])
+                intersect.push(group ? this.hooks.config.objInstances[i].boundingMesh.uuid : this.hooks.config.objInstances[i].serialize())
             }
         }
-        if (cut && obbys.length ) {
-            for (var i = 0; i < obbys.length; i++) {
-                this.hooks.config.removeObject(obbys[i])
+        
+        if (!group) {
+            if (cut && obbys.length && !group) {
+                for (var i = 0; i < obbys.length; i++) {
+                    this.hooks.config.removeObject(obbys[i])
+                }
             }
+            this.copy = JSON.stringify(intersect)
+        } else {
+            this.group = {owner: selected, pos: {x: selected.position.x, y: selected.position.y, z: selected.position.z}, objects: intersect}
         }
-        this.copy = JSON.stringify(intersect)
+    }
+    
+    checkGroup() {
+        if (!this.group) return
+        
+        let currPos = this.group.owner.position
+        let oldPos = this.group.pos
+        let diff = [0, 0, 0]
+        if (currPos.x != oldPos.x) diff[0] = currPos.x - oldPos.x
+        if (currPos.y != oldPos.y) diff[1] = currPos.y - oldPos.y
+        if (currPos.z != oldPos.z) diff[2] = currPos.z - oldPos.z
+        
+        for (var i = 0; i < this.hooks.config.objInstances.length; i++) {
+            if (!this.group.objects.includes(this.hooks.config.objInstances[i].boundingMesh.uuid)) continue
+            this.hooks.config.objInstances[i].boundingMesh.position.x += diff[0]
+            this.hooks.config.objInstances[i].boundingMesh.position.y += diff[1]
+            this.hooks.config.objInstances[i].boundingMesh.position.z += diff[2]            
+        }
+        this.group.pos = {x: currPos.x, y: currPos.y, z: currPos.z}
+    }
+    
+    stopGrouping() {
+        let uuid = this.group.owner.uuid
+        this.group = null
+        
+        for (var i = 0; i < this.hooks.config.objInstances.length; i++)
+            if (this.hooks.config.objInstances[i].boundingMesh.uuid == uuid)
+                return this.hooks.config.removeObject(this.hooks.config.objInstances[i])
     }
     
     spawnPlaceholder() {
@@ -168,7 +202,7 @@ class Mod {
     }
 
     addButtons() {
-        document.getElementById("bottomBar").insertAdjacentHTML('beforeend', '<div class="bottomPanel"><div id="copyObjects" class="bottomButton">Copy Objects</div><div id="cutObjects" class="bottomButton">Cut Objects</div><div id="pasteObjects" class="bottomButton">Paste Objects</div><div id="saveObjects" class="bottomButton">Save Objects</div></div><div class="bottomPanel"><div id="spawnPlaceholder" class="bottomButton">Spawn Placeholder</div></div>');
+        document.getElementById("bottomBar").insertAdjacentHTML('beforeend', '<div class="bottomPanel"><div id="copyObjects" class="bottomButton">Copy Objects</div><div id="cutObjects" class="bottomButton">Cut Objects</div><div id="pasteObjects" class="bottomButton">Paste Objects</div><div id="saveObjects" class="bottomButton">Save Objects</div><div id="groupObjects" class="bottomButton">Group Objects</div><div id="stopGrouping" class="bottomButton">Stop Grouping</div></div><div class="bottomPanel"><div id="spawnPlaceholder" class="bottomButton">Spawn Placeholder</div></div>');
         document.getElementById("copyObjects").addEventListener("click", t => {  
             let selected = this.objectSelected()
             if (!selected){
@@ -205,6 +239,22 @@ class Mod {
                 return alert('Please name your prefab')
             }
             this.download(this.copy, 'prefab_' + nme.replace(/ /g,"_") + '.txt', 'text/plain');
+        })
+        
+        document.getElementById("groupObjects").addEventListener("click", t => {  
+            let selected = this.objectSelected()
+            if (!selected){
+                return alert('Stretch a cube over your objects then click group')
+            }
+            this.copyObjects(false, true)
+        })
+        
+        
+        document.getElementById("stopGrouping").addEventListener("click", t => {  
+            if (!this.group){
+                return alert('You cant stop a group that doesnt exist')
+            }
+            this.stopGrouping()
         })
         
         document.getElementById("spawnPlaceholder").addEventListener("click", t => {  
@@ -252,6 +302,10 @@ class Mod {
             this.hooks.three.Math.degToRad(r[2]),
         ]
     }
+    
+    loop() {
+        this.checkGroup()
+    }
 
     onLoad() {
         this.addButtons()
@@ -270,7 +324,7 @@ GM_xmlhttpRequest({
             .replace('("Fog Color").listen().onChange', '("Fog Color").onChange')
             .replace(/(\w+).boundingNoncollidableBoxMaterial=new (.*)}\);const/, '$1.boundingNoncollidableBoxMaterial = new $2 });window.mod.hooks.object = $1;const')
             //.replace(/(\w+).init\(document.getElementById\("container"\)\)/, '$1.init(document.getElementById("container")), window.mod.hooks.config = $1')
-            .replace(/this\.transformControl\.update\(\)/, 'this.transformControl.update(),window.mod.hooks.config = this')
+            .replace(/this\.transformControl\.update\(\)/, 'this.transformControl.update(),window.mod.hooks.config = this,window.mod.loop()')
             .replace(/\[\],(\w+).open\(\),/, '[],$1.open(),window.mod.hooks.gui=$1,window.mod.setupMenu(),')
             .replace(/initScene\(\){this\.scene=new (\w+).Scene,/, 'initScene(){this.scene=new $1.Scene,window.mod.hooks.three = $1,')
             .replace(/{(\w+)\[(\w+)\]\=(\w+)}\);this\.objConfigOptions/, '{$1[$2]=$2 == "rot" ? window.mod.degToRad($3) : $3});this.objConfigOptions')
