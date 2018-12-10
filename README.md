@@ -23,7 +23,8 @@
 ### Requirements:
 - Tampermonkey
 - ES6 Support
-
 ### Userscript: [CLICK HERE](https://raw.githubusercontent.com/Tehchy/Krunker.io-Map-Editor-Mod/master/userscript.user.js)
+### Video: (https://youtu.be/mNtAKJ6g1MA)
 
-### Video: [Testing Old Version](https://youtu.be/mNtAKJ6g1MA)
+
+### Join use on Discord [MMOK](https://discord.gg/ybkUe5)
