@@ -10,6 +10,7 @@
 ### Keybinds:
 - Ctrl C - Copy Objects
 - Ctrl P - Paste Objects
+- Shift F - Vehicle Fixer
 
 ### Changes:
 - Sky Color, Ambient Light, Light Color and Fog Color can be inputed manually

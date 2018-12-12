@@ -3,7 +3,7 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      1.3
+// @version      1.4
 // @author       Tehchy
 // @match        https://krunker.io/editor.html
 // @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/prefabs.js?v=1.3
@@ -72,20 +72,29 @@ class Mod {
         if (json != null && json != "" && this.objectSelected()) this.replaceObject(json)
     }
 
-    replaceObject(str) {
+    replaceObject(str, fix = false) {
         let selected = this.objectSelected()
         if (!selected) {
             //this.hooks.config.addObject(this.hooks.object.defaultFromType("CUBE"))
             //selected = this.objectSelected()
         }
         if (selected) {
-            this.hooks.config.removeObject()
+            if (!fix) this.hooks.config.removeObject()
             
             let jsp = JSON.parse(str);
             jsp = jsp.objects ? jsp.objects : jsp
-            if (this.rotation > 0) {
-                jsp = this.rotateObjects(jsp, this.rotation)
+            
+            let rotation = this.rotation;
+            if (fix) {
+                this.hooks.gui.__folders["Object Config"].__controllers[1].setValue(false)
+                rotation = selected.rotation.y * 180 / Math.PI
+                rotation = rotation == 90 ? 270 : (rotation == 270 ? 90 : rotation)
             }
+             
+            if (rotation > 0) {
+                jsp = this.rotateObjects(jsp, rotation)
+            }
+            
             let center = this.findCenter(jsp)
             for (let ob of jsp) {
                 ob.p[0] += selected.userData.owner.position.x - center[0]
@@ -153,7 +162,7 @@ class Mod {
             if (object.p[2] + (object.s[2] /2) > yMax) yMax = object.p[2] + (object.s[2] /2)
         }
 
-        return [(xMin + xMax)/2, min, (yMin + yMax)/2]
+        return [Math.round((xMin + xMax)/2), min, Math.round((yMin + yMax)/2)]
     }
     
     copyObjects(cut = false, group = false, ret = false) {
@@ -212,7 +221,7 @@ class Mod {
         if (full) 
             obs = {
                 "name": "prefab_" + nme.replace(/ /g,"_"),
-                "modURL":"",
+                "modURL":"https://www.dropbox.com/s/4j76kiqemdo6d9a/MMOKBill.zip?dl=0",
                 "ambient":9937064,
                 "light":15923452,
                 "sky":14477549,
@@ -289,6 +298,10 @@ class Mod {
         return this.hooks.config.removeObject(selected.userData.owner)
     }
     
+    fixVehicle() {
+        this.replaceObject('[{"p":[-11,2,-1],"s":[47,9,17],"v":1},{"p":[-6,11,-1],"s":[26,6,17],"v":1}]', true)
+    }
+    
     spawnPlaceholder() {
         let pos = this.hooks.config.camera.getWorldPosition()
         let obph = {p: [], s: [10, 10, 10], e: 16777215, o: 0.3, c: 0}
@@ -312,12 +325,14 @@ class Mod {
         })
         
         window.addEventListener("keydown", t => {
-            if (!this.hooks.config.isTyping(t) && t.ctrlKey)
+            if (!this.hooks.config.isTyping(t))
                 switch (t.keyCode) {
                     case 67: //ctrl c
-                        return this.copyObjects()
+                        return t.ctrlKey ? this.copyObjects() : false
                     case 86:
-                        return this.pasteObjects()
+                        return t.ctrlKey ? this.pasteObjects() : false
+                    case 70:
+                        return t.shiftKey ? this.fixVehicle() : false
                 }
         })
     }
@@ -372,7 +387,7 @@ class Mod {
     setSettings(k, v) {
         console.log(this.settings)
         this.settings[k] = v
-        this.saveVal('krunker_editor_mod', this.settings)
+        this.saveVal('krunker_editor_mod', JSON.stringify(this.settings))
     }
     
     getSavedVal(t) {
@@ -466,7 +481,7 @@ GM_xmlhttpRequest({
             .replace(/(\w+).boundingNoncollidableBoxMaterial=new (.*)}\);const/, '$1.boundingNoncollidableBoxMaterial = new $2 });window.mod.hooks.object = $1;const')
             //.replace(/(\w+).init\(document.getElementById\("container"\)\)/, '$1.init(document.getElementById("container")), window.mod.hooks.config = $1')
             .replace(/this\.transformControl\.update\(\)/, 'this.transformControl.update(),window.mod.hooks.config = this,window.mod.loop()')
-            //.replace(/\[\],(\w+).open\(\),/, '[],$1.open(),window.mod.hooks.gui=$1,window.mod.setupMenu(),')
+            .replace(/\[\],(\w+).open\(\),/, '[],$1.open(),window.mod.hooks.gui=$1,')
             .replace(/initScene\(\){this\.scene=new (\w+).Scene,/, 'initScene(){this.scene=new $1.Scene,window.mod.hooks.three = $1,')
             .replace(/{(\w+)\[(\w+)\]\=(\w+)}\);this\.objConfigOptions/, '{$1[$2]=$2 == "rot" ? window.mod.degToRad($3) : $3});this.objConfigOptions')
             .replace('{this.removeObject()}', '{window.mod.objectSelected(true) ? window.mod.removeGroup() : this.removeObject()}')
