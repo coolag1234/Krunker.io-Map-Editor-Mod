@@ -3,10 +3,10 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      1.2
+// @version      1.3
 // @author       Tehchy
 // @match        https://krunker.io/editor.html
-// @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/prefabs.js?v=1.2
+// @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/prefabs.js?v=1.3
 // @grant        GM_xmlhttpRequest
 // @run-at       document-start
 // ==/UserScript==
@@ -83,26 +83,25 @@ class Mod {
             
             let jsp = JSON.parse(str);
             jsp = jsp.objects ? jsp.objects : jsp
+            if (this.rotation > 0) {
+                jsp = this.rotateObjects(jsp, this.rotation)
+            }
             let center = this.findCenter(jsp)
             for (let ob of jsp) {
                 ob.p[0] += selected.userData.owner.position.x - center[0]
                 ob.p[1] += selected.userData.owner.position.y - (selected.scale.y / 2) - center[1]
                 ob.p[2] += selected.userData.owner.position.z - center[2]
                 
-                if (this.rotation > 0) {
-                    ob = this.rotateObject(ob, this.rotation)
-                }
-                
                 this.hooks.config.addObject(this.hooks.object.deserialize(ob))
             }
             this.rotation = 0
-            this.prefabMenu.__controllers[0].setValue(this.rotation)
+            this.prefabMenu.__controllers[2].setValue(this.rotation)
         } else {
             alert("You must select a object first")
         }
     }
     
-    rotateObject(ob, rotation = 90) {
+    rotateObjects(ob, rotation = 90) {
         switch (rotation) {
             case 90: return this.changeAngle(ob)
             case 180: return this.reflectAngle(ob)
@@ -111,26 +110,29 @@ class Mod {
         }
     }
     
-    changeAngle(ob){
+    changeAngle(jsp){
         //Credit JustProb
-        let x = ob.s[0],
-            y = ob.s[2]
-        ob.s[0] = y
-        ob.s[2] = x
-        let a = ob.p[0],
-            b = ob.p[2]
-        ob.p[0] = b
-        ob.p[2] = a
+        for (let ob of jsp) {
+            let x = ob.s[0],
+                y = ob.s[2]
+            ob.s[0] = y
+            ob.s[2] = x
+            let a = ob.p[0],
+                b = ob.p[2]
+            ob.p[0] = b
+            ob.p[2] = a
+        }
         
-        return ob
+        return jsp
     }
 
-    reflectAngle(ob){
+    reflectAngle(jsp){
         //Credit JustProb
-        ob.p[0] = -1 * ob.p[0]
-        ob.p[2] = -1 * ob.p[2]
-        
-        return ob
+        for (let ob of jsp) {
+            ob.p[0] = -1 * ob.p[0]
+            ob.p[2] = -1 * ob.p[2]
+        }
+        return jsp
     }
     
     findCenter(item) {
