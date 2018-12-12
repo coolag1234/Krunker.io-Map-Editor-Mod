@@ -3,10 +3,10 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      1.1
+// @version      1.2
 // @author       Tehchy
 // @match        https://krunker.io/editor.html
-// @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/prefabs.js
+// @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/prefabs.js?v=1.2
 // @grant        GM_xmlhttpRequest
 // @run-at       document-start
 // ==/UserScript==
@@ -23,21 +23,51 @@ class Mod {
             three: null
         }
         this.settings = {
-            degToRad: false /// Change to true JustProb <3
+            degToRad: false
         }
         this.copy = null
-        this.group = null
+        this.groups = []
         this.rotation = 0
+        this.mainMenu = null
         this.prefabMenu = null
+        this.gui = null
         this.onLoad()
     }
 
-    objectSelected() {
+    objectSelected(group = false) {
         let selected = this.hooks.config.transformControl.object
-        return selected ? selected : false
+        return selected ? (group ? (Object.keys(this.groups).includes(selected.uuid) ? selected : false) : selected) : false
     }
     
-    jsonInput() {
+    jsonInput(fromfile = false) {
+        if (fromfile) {
+            let file = document.createElement('input')
+            file.type = 'file'
+            file.id = 'jsonInput'
+            
+            let self = this
+            file.addEventListener('change', function(evt) {
+                let files = evt.target.files;
+                if (files.length > 1) return alert('Only 1 file please')
+                if (files.length < 1) return alert('Please select 1 file')
+                let f = files[0]
+                let reader = new FileReader();
+
+                reader.onload = (function(theFile) {
+                    return e => {
+                        self.replaceObject(e.target.result)
+                    };
+                })(f);
+
+                reader.readAsText(f);
+            }, false);
+            
+            file.type = 'file'
+            file.id = 'jsonInput'
+            file.click()
+            
+            return
+        }
         let json = prompt("Import Object Json", "");
         if (json != null && json != "" && this.objectSelected()) this.replaceObject(json)
     }
@@ -55,13 +85,14 @@ class Mod {
             jsp = jsp.objects ? jsp.objects : jsp
             let center = this.findCenter(jsp)
             for (let ob of jsp) {
+                ob.p[0] += selected.userData.owner.position.x - center[0]
+                ob.p[1] += selected.userData.owner.position.y - (selected.scale.y / 2) - center[1]
+                ob.p[2] += selected.userData.owner.position.z - center[2]
+                
                 if (this.rotation > 0) {
                     ob = this.rotateObject(ob, this.rotation)
                 }
                 
-                ob.p[0] += selected.userData.owner.position.x - center[0]
-                ob.p[1] += selected.userData.owner.position.y - (selected.scale.y / 2) - center[1]
-                ob.p[2] += selected.userData.owner.position.z - center[2]
                 this.hooks.config.addObject(this.hooks.object.deserialize(ob))
             }
             this.rotation = 0
@@ -123,8 +154,11 @@ class Mod {
         return [(xMin + xMax)/2, min, (yMin + yMax)/2]
     }
     
-    copyObjects(cut = false, group = false) {
+    copyObjects(cut = false, group = false, ret = false) {
         let selected = this.objectSelected()
+        if (!selected) return alert('Stretch a cube over your objects then try again')
+        if (group && this.groups && Object.keys(this.groups).includes(selected.uuid)) return alert('You cant combine groups')
+        
         let pos = {
             minX: selected.position.x - (selected.scale.x / 2), 
             minY: selected.position.y, 
@@ -157,38 +191,100 @@ class Mod {
                     this.hooks.config.removeObject(obbys[i])
                 }
             }
-            this.copy = JSON.stringify(intersect)
+            
+            if (ret) {
+                return intersect
+            } else {
+                this.copy = JSON.stringify(intersect)
+            }
         } else {
-            this.group = {owner: selected, pos: {x: selected.position.x, y: selected.position.y, z: selected.position.z}, objects: intersect}
+            this.groups[selected.uuid] = {owner: selected, pos: {x: selected.position.x, y: selected.position.y, z: selected.position.z}, objects: intersect}
         }
+    }
+    
+    exportObjects(full = false) {
+        let obs = this.copyObjects(false, false, true)
+        if (obs.length == 0) return alert('There was nothing to save')
+        let nme = prompt("Name your prefab", "");
+        if (nme == null || nme == "") return alert('Please name your prefab')
+        if (full) 
+            obs = {
+                "name": "prefab_" + nme.replace(/ /g,"_"),
+                "modURL":"",
+                "ambient":9937064,
+                "light":15923452,
+                "sky":14477549,
+                "fog":9280160,
+                "fogD":900,
+                "camPos":[0,0,0],
+                "spawns":[], 
+                "objects": obs
+            }
+        this.download(JSON.stringify(obs), 'prefab_' + nme.replace(/ /g,"_") + '.txt', 'text/plain');
+    }
+    
+    pasteObjects() {
+        if (!this.copy) return alert('Please copy objects first')
+        if (!this.objectSelected()) return alert('Select a object you would like to replace with your copied objects')
+        this.replaceObject(this.copy)
+    }
+    
+    removeGroup() {
+        if (Object.keys(this.groups).length == 0) return
+        
+        let selected = this.objectSelected(true)
+        if (!selected) return 
+        
+        let remOb = []
+        
+        this.groups[selected.uuid].objects.push(selected.uuid)
+        let obs = this.hooks.config.objInstances.filter(ob => this.groups[selected.uuid].objects.includes(ob.boundingMesh.uuid))
+       /* for (var i = 0; i < this.hooks.config.objInstances.length; i++) {
+            if (!this.groups[selected.uuid].objects.includes(this.hooks.config.objInstances[i].boundingMesh.uuid)) continue
+            
+                remOb.push(this.hooks.config.objInstances[i])
+        }*/
+            
+        for (var i = 0; i < obs.length; i++)
+            this.hooks.config.removeObject(obs[i])
+        
+        delete this.groups[selected.uuid]
+    }
+    
+    duplicateGroup() {
+        if (Object.keys(this.groups).length == 0) return
+        return //later
     }
     
     checkGroup() {
-        if (!this.group) return
+        if (Object.keys(this.groups).length == 0) return
         
-        let currPos = this.group.owner.position
-        let oldPos = this.group.pos
-        let diff = [0, 0, 0]
-        if (currPos.x != oldPos.x) diff[0] = currPos.x - oldPos.x
-        if (currPos.y != oldPos.y) diff[1] = currPos.y - oldPos.y
-        if (currPos.z != oldPos.z) diff[2] = currPos.z - oldPos.z
-        
-        for (var i = 0; i < this.hooks.config.objInstances.length; i++) {
-            if (!this.group.objects.includes(this.hooks.config.objInstances[i].boundingMesh.uuid)) continue
-            this.hooks.config.objInstances[i].boundingMesh.position.x += diff[0]
-            this.hooks.config.objInstances[i].boundingMesh.position.y += diff[1]
-            this.hooks.config.objInstances[i].boundingMesh.position.z += diff[2]            
+        for (var uuid in this.groups) {
+            let group = this.groups[uuid],
+                currPos = group.owner.position,
+                oldPos = group.pos,
+                diff = [currPos.x - oldPos.x, currPos.y - oldPos.y, currPos.z - oldPos.z]
+            
+            if (diff[0] === 0 && diff[1] === 0 && diff[2] === 0) continue // no changes
+            
+            let obs = this.hooks.config.objInstances.filter(ob => group.objects.includes(ob.boundingMesh.uuid))
+            for (var i = 0; i < obs.length; i++) {
+                obs[i].boundingMesh.position.x += diff[0]
+                obs[i].boundingMesh.position.y += diff[1]
+                obs[i].boundingMesh.position.z += diff[2]   
+            }
+            this.groups[group.owner.uuid].pos = {x: currPos.x, y: currPos.y, z: currPos.z}
         }
-        this.group.pos = {x: currPos.x, y: currPos.y, z: currPos.z}
     }
     
     stopGrouping() {
-        let uuid = this.group.owner.uuid
-        this.group = null
+        if (Object.keys(this.groups).length == 0) return alert('You cant stop a group that doesnt exist')
+            
+        let selected = this.objectSelected(true)
+        if (!selected) return alert('You cant stop a group that doesnt exist')
         
-        for (var i = 0; i < this.hooks.config.objInstances.length; i++)
-            if (this.hooks.config.objInstances[i].boundingMesh.uuid == uuid)
-                return this.hooks.config.removeObject(this.hooks.config.objInstances[i])
+        delete this.groups[selected.uuid]
+        return this.hooks.config.removeObject(selected.userData.owner)
     }
     
     spawnPlaceholder() {
@@ -206,84 +302,22 @@ class Mod {
             (a.minZ <= b.maxZ && a.maxZ >= b.minZ);
     }
 
-    addButtons() {
-        document.getElementById("bottomBar").insertAdjacentHTML('beforeend', '<div class="bottomPanel"><div id="copyObjects" class="bottomButton">Copy Objects</div><div id="cutObjects" class="bottomButton">Cut Objects</div><div id="pasteObjects" class="bottomButton">Paste Objects</div><div id="saveObjects" class="bottomButton">Save Objects</div><div id="groupObjects" class="bottomButton">Group Objects</div><div id="stopGrouping" class="bottomButton">Stop Grouping</div></div><div class="bottomPanel"><div id="spawnPlaceholder" class="bottomButton">Spawn Placeholder</div></div>');
-        document.getElementById("copyObjects").addEventListener("click", t => {  
-            let selected = this.objectSelected()
-            if (!selected){
-                return alert('Stretch a cube over your objects then click copy')
-            }
-            this.copyObjects()
-        })
-        
-        document.getElementById("cutObjects").addEventListener("click", t => {  
-            let selected = this.objectSelected()
-            if (!selected){
-                return alert('Stretch a cube over your objects then click cut')
-            }
-            this.copyObjects(true)
-        })
-        
-        document.getElementById("pasteObjects").addEventListener("click", t => {  
-            let selected = this.objectSelected()
-            if (!selected){
-                return alert('Select a object you would like to replace with your copied objects')
-            }
-            if (!this.copy) {
-                return alert('Please copy objects first')
-            }
-            this.replaceObject(this.copy)
-        })
-        
-        document.getElementById("saveObjects").addEventListener("click", t => {  
-            if (!this.copy) {
-                return alert('Please copy objects first')
-            }
-            let nme = prompt("Name your prefab", "");
-            if (nme == null) {
-                return alert('Please name your prefab')
-            }
-            this.download(this.copy, 'prefab_' + nme.replace(/ /g,"_") + '.txt', 'text/plain');
-        })
-        
-        document.getElementById("groupObjects").addEventListener("click", t => {  
-            let selected = this.objectSelected()
-            if (!selected){
-                return alert('Stretch a cube over your objects then click group')
-            }
-            this.copyObjects(false, true)
-        })
-        
-        
-        document.getElementById("stopGrouping").addEventListener("click", t => {  
-            if (!this.group){
-                return alert('You cant stop a group that doesnt exist')
-            }
-            this.stopGrouping()
-        })
-        
+    addControls() {
+        document.getElementById("bottomBar").insertAdjacentHTML('beforeend', '<div class="bottomPanel"><div id="spawnPlaceholder" class="bottomButton">Spawn Placeholder</div></div>');
+
         document.getElementById("spawnPlaceholder").addEventListener("click", t => {  
             this.spawnPlaceholder()
         })
-    }
-
-    setupMenu() {
-        this.prefabMenu = this.hooks.gui.addFolder("Prefabs");
-        let createObjects = {
-            rotation: 0
-        }
-        let prefabs = localStorage.getItem('krunk_prefabs') ? JSON.parse(localStorage.getItem('krunk_prefabs')) : {}
         
-        createObjects['json'] = (() => this.jsonInput())
-        this.prefabMenu.add(createObjects, "json").name("Replace Object (w/ json)")
-        this.prefabMenu.add(createObjects, "rotation", 0, 270, 90).name("Rotation").onChange(t => {this.rotation = t})          
-        for (let cat in prefabs) {
-            let category = this.prefabMenu.addFolder(cat)
-            for (let ob in prefabs[cat]) {
-                createObjects[ob] = (() => this.replaceObject(JSON.stringify(prefabs[cat][ob])))
-                category.add(createObjects, ob).name(ob)
-            }
-        }
+        window.addEventListener("keydown", t => {
+            if (!this.hooks.config.isTyping(t) && t.ctrlKey)
+                switch (t.keyCode) {
+                    case 67: //ctrl c
+                        return this.copyObjects()
+                    case 86:
+                        return this.pasteObjects()
+                }
+        })
     }
     
     download(content, fileName, contentType) {
@@ -304,12 +338,116 @@ class Mod {
         ]
     }
     
+	addStyle(css) {
+		let head = document.head || document.getElementsByTagName('head')[0]
+		if (head) {
+			let style = document.createElement("style")
+			style.type = "text/css"
+			style.appendChild(document.createTextNode(css))
+			head.appendChild(style)
+		}
+	}
+    
     loop() {
         this.checkGroup()
     }
 
+    removeAd() {//Sorry Sidney it blocks my second GUI
+        document.body.removeChild(document.body.children[0])
+    }
+    
+    setupSettings() {
+        let ls = this.getSavedVal('krunker_editor_mod')
+        if (ls == null) return
+        try {
+            JSON.parse(ls);
+        } catch (e) {
+            return
+        }
+        this.settings = JSON.parse(ls);
+    }
+    
+    setSettings(k, v) {
+        console.log(this.settings)
+        this.settings[k] = v
+        this.saveVal('krunker_editor_mod', this.settings)
+    }
+    
+    getSavedVal(t) {
+        const r = "undefined" != typeof Storage;
+        return r ? localStorage.getItem(t) : null
+    }
+    
+    saveVal(t, e) {
+        const r = "undefined" != typeof Storage;
+        r && localStorage.setItem(t, e)
+    }
+
+    addGui() {
+        this.addStyle(`#gui { position: absolute; top: 2px; left: 2px }`)
+        
+        this.gui = new dat.GUI
+        this.gui.domElement.id = 'gui'
+        
+        let options = {rotation: 0}
+        options.create = (() => this.copyObjects(false, true))
+        options.stop = (() => this.stopGrouping())
+        options.exportObj = (() => this.exportObjects())
+        options.exportFull = (() => this.exportObjects(true))
+        options.copy = (() => this.copyObjects())
+        options.cut = (() => this.copyObjects(true))
+        options.paste = (() => this.pasteObjects())
+        options.degToRad = this.settings.degToRad
+        
+        this.mainMenu = this.gui.addFolder("Map Editor Mod")
+        this.mainMenu.open()
+        
+        this.prefabMenu = this.mainMenu.addFolder("Prefabs")
+        let prefabs = localStorage.getItem('krunk_prefabs') ? JSON.parse(localStorage.getItem('krunk_prefabs')) : {}
+        
+        options.json = (() => this.jsonInput())
+        options.file = (() => this.jsonInput(true))
+        this.prefabMenu.add(options, "json").name("Json Import")
+        this.prefabMenu.add(options, "file").name("File Import")
+        this.prefabMenu.add(options, "rotation", 0, 270, 90).name("Rotation").onChange(t => {this.rotation = t})          
+        for (let cat in prefabs) {
+            let category = this.prefabMenu.addFolder(cat)
+            for (let ob in prefabs[cat]) {
+                if (!Array.isArray(prefabs[cat][ob])) {
+                    let subCategory = category.addFolder(ob)
+                    for (let ob2 in prefabs[cat][ob]) {
+                        options[ob2] = (() => this.replaceObject(JSON.stringify(prefabs[cat][ob][ob2])))
+                        subCategory.add(options, ob2).name(ob2)
+                    }
+                } else {
+                    options[ob] = (() => this.replaceObject(JSON.stringify(prefabs[cat][ob])))
+                    category.add(options, ob).name(ob)
+                }
+            }
+        }
+        
+        let groupingMenu = this.mainMenu.addFolder("MultiObject")
+        groupingMenu.open()
+        groupingMenu.add(options, "create").name("Create Group") 
+        groupingMenu.add(options, "stop").name("Stop Group") 
+        groupingMenu.add(options, "copy").name("Copy")
+        groupingMenu.add(options, "cut").name("Cut")
+        groupingMenu.add(options, "paste").name("Paste")
+        
+        let exportMenu = groupingMenu.addFolder("Export")
+        
+        exportMenu.add(options, "exportObj").name("Objects") 
+        exportMenu.add(options, "exportFull").name("Full") 
+        
+        let settingsMenu = this.mainMenu.addFolder('Settings')
+        settingsMenu.add(options, "degToRad").name("Anti Radians").onChange(t => {this.setSettings('degToRad', t)})       
+    }
+
     onLoad() {
-        this.addButtons()
+        this.setupSettings()
+        this.removeAd()
+        this.addGui()
+        this.addControls()
     }
 }
 
@@ -326,9 +464,12 @@ GM_xmlhttpRequest({
             .replace(/(\w+).boundingNoncollidableBoxMaterial=new (.*)}\);const/, '$1.boundingNoncollidableBoxMaterial = new $2 });window.mod.hooks.object = $1;const')
             //.replace(/(\w+).init\(document.getElementById\("container"\)\)/, '$1.init(document.getElementById("container")), window.mod.hooks.config = $1')
             .replace(/this\.transformControl\.update\(\)/, 'this.transformControl.update(),window.mod.hooks.config = this,window.mod.loop()')
-            .replace(/\[\],(\w+).open\(\),/, '[],$1.open(),window.mod.hooks.gui=$1,window.mod.setupMenu(),')
+            //.replace(/\[\],(\w+).open\(\),/, '[],$1.open(),window.mod.hooks.gui=$1,window.mod.setupMenu(),')
             .replace(/initScene\(\){this\.scene=new (\w+).Scene,/, 'initScene(){this.scene=new $1.Scene,window.mod.hooks.three = $1,')
             .replace(/{(\w+)\[(\w+)\]\=(\w+)}\);this\.objConfigOptions/, '{$1[$2]=$2 == "rot" ? window.mod.degToRad($3) : $3});this.objConfigOptions')
+            .replace('{this.removeObject()}', '{window.mod.objectSelected(true) ? window.mod.removeGroup() : this.removeObject()}')
+            .replace('{this.duplicateObject()}', '{window.mod.objectSelected(true) ? window.mod.duplicateGroup() : this.duplicateObject()}')
+            
 
         GM_xmlhttpRequest({
             method: "GET",

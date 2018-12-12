@@ -1,11 +1,15 @@
 # Krunker.io Map Editor Mod
 
 ### Features:
-- Object Replacer (Replace a object with custom json or a prefab)
-- MultiObject (Select, Copy, Cut, Paste and Save a group of selected objects)
+- Object Replacer (Replace a object with custom json(or file) or a prefab)
+- MultiObject (Select, Copy, Cut, Paste and Export a group of selected objects)
 - Custom Assets/Prefabs
 - Object Grouping (Allows you to move multiple objects at once)
 - Placeholder (Spawns a cube right on you for ease of use)
+
+### Keybinds:
+- Ctrl C - Copy Objects
+- Ctrl P - Paste Objects
 
 ### Changes:
 - Sky Color, Ambient Light, Light Color and Fog Color can be inputed manually
@@ -24,7 +28,7 @@
 - Tampermonkey
 - ES6 Support
 ### Userscript: [CLICK HERE](https://raw.githubusercontent.com/Tehchy/Krunker.io-Map-Editor-Mod/master/userscript.user.js)
-### Video: (https://youtu.be/mNtAKJ6g1MA)
+### Video: [Showcase](https://youtu.be/mNtAKJ6g1MA)
 
 
 ### Join use on Discord [MMOK](https://discord.gg/ybkUe5)
