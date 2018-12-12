@@ -3,7 +3,7 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      1.4
+// @version      1.5
 // @author       Tehchy
 // @match        https://krunker.io/editor.html
 // @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/prefabs.js?v=1.3
@@ -87,8 +87,7 @@ class Mod {
             let rotation = this.rotation;
             if (fix) {
                 this.hooks.gui.__folders["Object Config"].__controllers[1].setValue(false)
-                rotation = selected.rotation.y * 180 / Math.PI
-                rotation = rotation == 90 ? 270 : (rotation == 270 ? 90 : rotation)
+                rotation = (selected.rotation.y * 180 / Math.PI)
             }
              
             if (rotation > 0) {
@@ -99,7 +98,7 @@ class Mod {
             for (let ob of jsp) {
                 ob.p[0] += selected.userData.owner.position.x - center[0]
                 ob.p[1] += selected.userData.owner.position.y - (selected.scale.y / 2) - center[1]
-                ob.p[2] += selected.userData.owner.position.z - center[2]
+                ob.p[2] += selected.userData.owner.position.z - center[2] - (fix ? 0.5 : 0)
                 
                 this.hooks.config.addObject(this.hooks.object.deserialize(ob))
             }
@@ -109,8 +108,36 @@ class Mod {
             alert("You must select a object first")
         }
     }
+
+    rotateObjects(jsp, deg) {
+        //Credit JustProb
+        deg = deg * (Math.PI / 180)
+
+        for (let ob of jsp) {
+            if (ob.id == 4) {
+                alert('Sorry we cant rotate planes (Ramps)')
+                return jsp
+            }
+            let dist = Math.sqrt(ob.p[0] * ob.p[0] + ob.p[2] * ob.p[2])
+            let angle = this.getAngle(ob)
+            ob.p[0] = Math.cos(angle - deg) * dist
+            ob.p[2] = Math.sin(angle - deg) * dist
+            ob.r = [0, 0, 0]
+            ob.r[1] = deg
+        }
+
+        return jsp
+    }
     
-    rotateObjects(ob, rotation = 90) {
+    getAngle(ob, live = false) {
+        //Credit JustProb
+        let x = live ? ob.x : ob.p[0],
+            z = live ? ob.z : ob.p[2],
+            angle =  Math.atan2(-1 * z, x)
+        return angle < 0 ? angle + (Math.PI * 2) : angle
+    } 
+    
+    rotateObjectsOld(ob, rotation = 90) {
         switch (rotation) {
             case 90: return this.changeAngle(ob)
             case 180: return this.reflectAngle(ob)
@@ -274,15 +301,17 @@ class Mod {
             let group = this.groups[uuid],
                 currPos = group.owner.position,
                 oldPos = group.pos,
-                diff = [currPos.x - oldPos.x, currPos.y - oldPos.y, currPos.z - oldPos.z]
-            
-            if (diff[0] === 0 && diff[1] === 0 && diff[2] === 0) continue // no changes
+                diffPos = [currPos.x - oldPos.x, currPos.y - oldPos.y, currPos.z - oldPos.z]
+                
+                console.log(deg)
+                
+            if (diffPos[0] === 0 && diffPos[1] === 0 && diffPos[2] === 0) continue // no changes
             
             let obs = this.hooks.config.objInstances.filter(ob => group.objects.includes(ob.boundingMesh.uuid))
             for (var i = 0; i < obs.length; i++) {
-                obs[i].boundingMesh.position.x += diff[0]
-                obs[i].boundingMesh.position.y += diff[1]
-                obs[i].boundingMesh.position.z += diff[2]   
+                obs[i].boundingMesh.position.x += diffPos[0]
+                obs[i].boundingMesh.position.y += diffPos[1]
+                obs[i].boundingMesh.position.z += diffPos[2]   
             }
             this.groups[group.owner.uuid].pos = {x: currPos.x, y: currPos.y, z: currPos.z}
         }
@@ -299,7 +328,7 @@ class Mod {
     }
     
     fixVehicle() {
-        this.replaceObject('[{"p":[-11,2,-1],"s":[47,9,17],"v":1},{"p":[-6,11,-1],"s":[26,6,17],"v":1}]', true)
+        this.replaceObject('[{"p":[0,0,0],"s":[47,9,17],"v":1},{"p":[5,9,0],"s":[26,6,17],"v":1}]', true)
     }
     
     spawnPlaceholder() {
@@ -426,7 +455,7 @@ class Mod {
         options.file = (() => this.jsonInput(true))
         this.prefabMenu.add(options, "json").name("Json Import")
         this.prefabMenu.add(options, "file").name("File Import")
-        this.prefabMenu.add(options, "rotation", 0, 270, 90).name("Rotation").onChange(t => {this.rotation = t})          
+        this.prefabMenu.add(options, "rotation", 0, 359, 1).name("Rotation").onChange(t => {this.rotation = t})          
         for (let cat in prefabs) {
             let category = this.prefabMenu.addFolder(cat)
             for (let ob in prefabs[cat]) {
