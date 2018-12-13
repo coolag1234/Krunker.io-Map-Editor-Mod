@@ -3,7 +3,7 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      1.5
+// @version      1.6
 // @author       Tehchy
 // @match        https://krunker.io/editor.html
 // @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/prefabs.js?v=1.3
@@ -15,7 +15,8 @@ window.stop()
 document.innerHTML = ""
 
 class Mod {
-    constructor() {
+    constructor(info) {
+        this.info = info
         this.hooks = {
             object: null,
             config: null,
@@ -303,8 +304,6 @@ class Mod {
                 oldPos = group.pos,
                 diffPos = [currPos.x - oldPos.x, currPos.y - oldPos.y, currPos.z - oldPos.z]
                 
-                console.log(deg)
-                
             if (diffPos[0] === 0 && diffPos[1] === 0 && diffPos[2] === 0) continue // no changes
             
             let obs = this.hooks.config.objInstances.filter(ob => group.objects.includes(ob.boundingMesh.uuid))
@@ -414,7 +413,6 @@ class Mod {
     }
     
     setSettings(k, v) {
-        console.log(this.settings)
         this.settings[k] = v
         this.saveVal('krunker_editor_mod', JSON.stringify(this.settings))
     }
@@ -445,7 +443,7 @@ class Mod {
         options.paste = (() => this.pasteObjects())
         options.degToRad = this.settings.degToRad
         
-        this.mainMenu = this.gui.addFolder("Map Editor Mod")
+        this.mainMenu = this.gui.addFolder("Map Editor Mod v" + this.info.script.version)
         this.mainMenu.open()
         
         this.prefabMenu = this.mainMenu.addFolder("Prefabs")
@@ -516,13 +514,12 @@ GM_xmlhttpRequest({
             .replace('{this.removeObject()}', '{window.mod.objectSelected(true) ? window.mod.removeGroup() : this.removeObject()}')
             .replace('{this.duplicateObject()}', '{window.mod.objectSelected(true) ? window.mod.duplicateGroup() : this.duplicateObject()}')
             
-
         GM_xmlhttpRequest({
             method: "GET",
             url: "https://krunker.io/editor.html",
             onload: res => {
                 let html = res.responseText
-                html = html.replace(' src="js/editor.js">', `>${Mod.toString()}\nwindow.mod = new Mod();\n${code.toString()}`)
+                html = html.replace(' src="js/editor.js">', `>${Mod.toString()}\nwindow.mod = new Mod(${JSON.stringify(GM.info)});\n${code.toString()}`)
                 document.open()
                 document.write(html)
                 document.close()
