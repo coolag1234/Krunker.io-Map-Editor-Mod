@@ -3,7 +3,7 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      1.6
+// @version      1.7
 // @author       Tehchy
 // @match        https://krunker.io/editor.html
 // @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/prefabs.js?v=1.3
@@ -88,7 +88,7 @@ class Mod {
             let rotation = this.rotation;
             if (fix) {
                 this.hooks.gui.__folders["Object Config"].__controllers[1].setValue(false)
-                rotation = (selected.rotation.y * 180 / Math.PI)
+                rotation = this.toDegree(selected.rotation.y) + 180
             }
              
             if (rotation > 0) {
@@ -109,10 +109,18 @@ class Mod {
             alert("You must select a object first")
         }
     }
+    
+    toRadians(angle) {
+        return angle * (Math.PI / 180)
+    }
+    
+    toDegree(angle) {
+      return angle * (180 /Math.PI)
+    }
 
     rotateObjects(jsp, deg) {
         //Credit JustProb
-        deg = deg * (Math.PI / 180)
+        deg = this.toRadians(deg - 180)
 
         for (let ob of jsp) {
             if (ob.id == 4) {
