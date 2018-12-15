@@ -6,7 +6,7 @@
 // @version      1.8
 // @author       Tehchy
 // @match        https://krunker.io/editor.html
-// @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/prefabs.js?v=1.3
+// @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/prefabs.js?v=1.8
 // @grant        GM_xmlhttpRequest
 // @run-at       document-start
 // ==/UserScript==
