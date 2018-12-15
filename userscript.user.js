@@ -3,7 +3,7 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      1.7
+// @version      1.8
 // @author       Tehchy
 // @match        https://krunker.io/editor.html
 // @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/prefabs.js?v=1.3
@@ -24,7 +24,8 @@ class Mod {
             three: null
         }
         this.settings = {
-            degToRad: false
+            degToRad: false,
+            backupMap: false
         }
         this.copy = null
         this.groups = []
@@ -115,7 +116,7 @@ class Mod {
     }
     
     toDegree(angle) {
-      return angle * (180 /Math.PI)
+      return angle * (180 / Math.PI)
     }
 
     rotateObjects(jsp, deg) {
@@ -129,10 +130,10 @@ class Mod {
             }
             let dist = Math.sqrt(ob.p[0] * ob.p[0] + ob.p[2] * ob.p[2])
             let angle = this.getAngle(ob)
-            ob.p[0] = Math.cos(angle - deg) * dist
+            ob.p[0] = -1 * Math.cos(-angle + deg) * dist
             ob.p[2] = Math.sin(angle - deg) * dist
-            ob.r = [0, 0, 0]
-            ob.r[1] = deg
+            if (ob.r == undefined) ob.r = [0,0,0]
+            ob.r[1] = this.toRadians(360 - this.toDegree(deg)) + ob.r[1];
         }
 
         return jsp
@@ -180,22 +181,21 @@ class Mod {
         return jsp
     }
     
-    findCenter(item) {
+    findCenter(jsp) {
         //Credit JustProb
-        let min = item[0].p[1],
-        xMin = item[0].p[0] - (item[0].s[0] /2),
-        xMax = item[0].p[0] + (item[0].s[0] /2),
-        yMin = item[0].p[2] - (item[0].s[2] /2),
-        yMax = item[0].p[2] + (item[0].s[2] /2)
+        let min = jsp[0].p[1],
+        xMin = jsp[0].p[0] - (jsp[0].s[0] /2),
+        xMax = jsp[0].p[0] + (jsp[0].s[0] /2),
+        yMin = jsp[0].p[2] - (jsp[0].s[2] /2),
+        yMax = jsp[0].p[2] + (jsp[0].s[2] /2)
 
 
-        for (var index in item) {
-            let object = item[index]
-            if (object.p[1]  < min) min = object.p[1]
-            if (object.p[0] - (object.s[0] /2) < xMin) xMin = object.p[0] - (object.s[0] /2)
-            if (object.p[0] + (object.s[0] /2) > xMax) xMax = object.p[0] + (object.s[0] /2)
-            if (object.p[2] - (object.s[2] /2) < yMin) yMin = object.p[2] - (object.s[2] /2)
-            if (object.p[2] + (object.s[2] /2) > yMax) yMax = object.p[2] + (object.s[2] /2)
+        for (let ob of jsp) {
+            if (ob.p[1]  < min) min = ob.p[1]
+            if (ob.p[0] - (ob.s[0] /2) < xMin) xMin = ob.p[0] - (ob.s[0] /2)
+            if (ob.p[0] + (ob.s[0] /2) > xMax) xMax = ob.p[0] + (ob.s[0] /2)
+            if (ob.p[2] - (ob.s[2] /2) < yMin) yMin = ob.p[2] - (ob.s[2] /2)
+            if (ob.p[2] + (ob.s[2] /2) > yMax) yMax = ob.p[2] + (ob.s[2] /2)
         }
 
         return [Math.round((xMin + xMax)/2), min, Math.round((yMin + yMax)/2)]
@@ -216,19 +216,18 @@ class Mod {
         }
         let intersect = []
         let obbys = []
-        for (var i = 0; i < this.hooks.config.objInstances.length; i++) {
-            if (this.hooks.config.objInstances[i].boundingMesh.uuid == selected.uuid) continue
-            let ob = this.hooks.config.objInstances[i].boundingMesh
+        for (let ob of this.hooks.config.objInstances) {
+            if (ob.boundingMesh.uuid == selected.uuid) continue
             if (this.intersect({
-                    minX: ob.position.x - (ob.scale.x / 2), 
-                    minY: ob.position.y, 
-                    minZ: ob.position.z - (ob.scale.z / 2), 
-                    maxX: ob.position.x + (ob.scale.x / 2), 
-                    maxY: ob.position.y + ob.scale.y, 
-                    maxZ: ob.position.z + (ob.scale.z / 2)
+                    minX: ob.boundingMesh.position.x - (ob.boundingMesh.scale.x / 2), 
+                    minY: ob.boundingMesh.position.y, 
+                    minZ: ob.boundingMesh.position.z - (ob.boundingMesh.scale.z / 2), 
+                    maxX: ob.boundingMesh.position.x + (ob.boundingMesh.scale.x / 2), 
+                    maxY: ob.boundingMesh.position.y + ob.boundingMesh.scale.y, 
+                    maxZ: ob.boundingMesh.position.z + (ob.boundingMesh.scale.z / 2)
                 }, pos)) {
-                if (!group) obbys.push(this.hooks.config.objInstances[i])
-                intersect.push(group ? this.hooks.config.objInstances[i].boundingMesh.uuid : this.hooks.config.objInstances[i].serialize())
+                if (!group) obbys.push(ob)
+                intersect.push(group ? ob.boundingMesh.uuid : ob.serialize())
             }
         }
         
@@ -315,10 +314,11 @@ class Mod {
             if (diffPos[0] === 0 && diffPos[1] === 0 && diffPos[2] === 0) continue // no changes
             
             let obs = this.hooks.config.objInstances.filter(ob => group.objects.includes(ob.boundingMesh.uuid))
-            for (var i = 0; i < obs.length; i++) {
-                obs[i].boundingMesh.position.x += diffPos[0]
-                obs[i].boundingMesh.position.y += diffPos[1]
-                obs[i].boundingMesh.position.z += diffPos[2]   
+
+            for (let ob of obs) {
+                ob.boundingMesh.position.x += diffPos[0]
+                ob.boundingMesh.position.y += diffPos[1]
+                ob.boundingMesh.position.z += diffPos[2]
             }
             this.groups[group.owner.uuid].pos = {x: currPos.x, y: currPos.y, z: currPos.z}
         }
@@ -345,6 +345,50 @@ class Mod {
         obph.p[1] = pos.y - 10
         obph.p[2] = pos.z
         this.hooks.config.addObject(this.hooks.object.deserialize(obph))
+    }
+    
+    colorizeMap(input = false, gold = false, rand = false) {
+        if (this.settings.backupMap) this.backupMap()
+        
+        if (input != false && (input == null || input == "")) return alert("Please input colors (ex: #000000,#ffffff)")
+            
+        if (input) input = input.trim().split(',')
+
+        for (let ob of this.hooks.config.objInstances) {
+            if (input) ob.color = input.length > 1 ? input[Math.floor(Math.random() * input.length)] : input[0]
+            if (gold) ob.color = "#FFDF00", ob.emissive = "#D4AF37"
+            if (rand) ob.color = this.getRandomColor()
+        }
+    }
+        
+    getRandomColor() {
+        let length = 6,
+            chars = '0123456789ABCDEF',
+            hex = '#';
+        while (length--) hex += chars[(Math.random() * 16) | 0]
+        return hex
+    }
+    
+    scaleMap() {
+        if (this.settings.backupMap) this.backupMap()
+            
+        let sX = this.mainMenu.__folders["Other Features"].__folders["Scale Map"].__controllers[0].getValue(),
+            sY = this.mainMenu.__folders["Other Features"].__folders["Scale Map"].__controllers[1].getValue(),
+            sZ = this.mainMenu.__folders["Other Features"].__folders["Scale Map"].__controllers[2].getValue()
+            
+        for (let ob of this.hooks.config.objInstances) {
+            ob.pos[0] *= sX,
+            ob.pos[1] *= sY,
+            ob.pos[2] *= sZ
+
+            ob.size[0] *= sX,
+            ob.size[1] *= sY,
+            ob.size[2] *= sZ
+        }
+    }
+    
+    backupMap() {
+        return this.hooks.config.exportMap()
     }
         
     intersect(a, b) {
@@ -417,7 +461,10 @@ class Mod {
         } catch (e) {
             return
         }
-        this.settings = JSON.parse(ls);
+        let jsp = JSON.parse(ls)
+        for (let set in jsp) {
+            this.settings[set] = jsp[set]
+        }
     }
     
     setSettings(k, v) {
@@ -450,6 +497,14 @@ class Mod {
         options.cut = (() => this.copyObjects(true))
         options.paste = (() => this.pasteObjects())
         options.degToRad = this.settings.degToRad
+        options.backupMap = this.settings.backupMap
+        options.scaleMapX = 0
+        options.scaleMapY = 0
+        options.scaleMapZ = 0      
+        options.scaleMap = (() => this.scaleMap())
+        options.colorizeR = (() => this.colorizeMap(false, false, true))
+        options.colorizeG = (() => this.colorizeMap(false, true))
+        options.colorizeI = (() => this.colorizeMap(prompt("Input colors. (Seperate using a comma)", "")))
         
         this.mainMenu = this.gui.addFolder("Map Editor Mod v" + this.info.script.version)
         this.mainMenu.open()
@@ -489,10 +544,24 @@ class Mod {
         let exportMenu = groupingMenu.addFolder("Export")
         
         exportMenu.add(options, "exportObj").name("Objects") 
-        exportMenu.add(options, "exportFull").name("Full") 
+        exportMenu.add(options, "exportFull").name("Full")         
+        
+        let otherMenu = this.mainMenu.addFolder("Other Features")
+        
+        let colorizeMenu = otherMenu.addFolder("Colorize")
+        colorizeMenu.add(options, "colorizeR").name("Random") 
+        colorizeMenu.add(options, "colorizeG").name("Gold") 
+        colorizeMenu.add(options, "colorizeI").name("Input") 
+        
+        let scaleMapMenu = otherMenu.addFolder("Scale Map")
+        scaleMapMenu.add(options, "scaleMapX").name("X") 
+        scaleMapMenu.add(options, "scaleMapY").name("Y") 
+        scaleMapMenu.add(options, "scaleMapZ").name("Z") 
+        scaleMapMenu.add(options, "scaleMap").name("Scale")
         
         let settingsMenu = this.mainMenu.addFolder('Settings')
-        settingsMenu.add(options, "degToRad").name("Anti Radians").onChange(t => {this.setSettings('degToRad', t)})       
+        settingsMenu.add(options, "degToRad").name("Anti Radians").onChange(t => {this.setSettings('degToRad', t)})      
+        settingsMenu.add(options, "backupMap").name("Auto Backup").onChange(t => {this.setSettings('backupMap', t)})          
     }
 
     onLoad() {
