@@ -3,10 +3,10 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      1.8
+// @version      1.9
 // @author       Tehchy
 // @match        https://krunker.io/editor.html
-// @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/prefabs.js?v=1.8
+// @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/prefabs.js?v=1.9
 // @grant        GM_xmlhttpRequest
 // @run-at       document-start
 // ==/UserScript==
@@ -25,7 +25,9 @@ class Mod {
         }
         this.settings = {
             degToRad: false,
-            backupMap: false
+            backupMap: false,
+            antiAlias: false,
+            highPrecision: false,
         }
         this.copy = null
         this.groups = []
@@ -387,6 +389,10 @@ class Mod {
         }
     }
     
+    transformMap() {
+        return alert('This will be functional in a later update')
+    }
+    
     backupMap() {
         return this.hooks.config.exportMap()
     }
@@ -498,10 +504,13 @@ class Mod {
         options.paste = (() => this.pasteObjects())
         options.degToRad = this.settings.degToRad
         options.backupMap = this.settings.backupMap
+        options.antiAlias = this.settings.antiAlias
+        options.highPrecision = this.settings.highPrecision
         options.scaleMapX = 0
         options.scaleMapY = 0
         options.scaleMapZ = 0      
-        options.scaleMap = (() => this.scaleMap())
+        options.scaleMap = (() => this.scaleMap())    
+        options.transformMap = (() => this.transformMap())
         options.colorizeR = (() => this.colorizeMap(false, false, true))
         options.colorizeG = (() => this.colorizeMap(false, true))
         options.colorizeI = (() => this.colorizeMap(prompt("Input colors. (Seperate using a comma)", "")))
@@ -516,22 +525,8 @@ class Mod {
         options.file = (() => this.jsonInput(true))
         this.prefabMenu.add(options, "json").name("Json Import")
         this.prefabMenu.add(options, "file").name("File Import")
-        this.prefabMenu.add(options, "rotation", 0, 359, 1).name("Rotation").onChange(t => {this.rotation = t})          
-        for (let cat in prefabs) {
-            let category = this.prefabMenu.addFolder(cat)
-            for (let ob in prefabs[cat]) {
-                if (!Array.isArray(prefabs[cat][ob])) {
-                    let subCategory = category.addFolder(ob)
-                    for (let ob2 in prefabs[cat][ob]) {
-                        options[ob2] = (() => this.replaceObject(JSON.stringify(prefabs[cat][ob][ob2])))
-                        subCategory.add(options, ob2).name(ob2)
-                    }
-                } else {
-                    options[ob] = (() => this.replaceObject(JSON.stringify(prefabs[cat][ob])))
-                    category.add(options, ob).name(ob)
-                }
-            }
-        }
+        this.prefabMenu.add(options, "rotation", 0, 359, 1).name("Rotation").onChange(t => {this.rotation = t})  
+        this.prefabFolder(prefabs, this.prefabMenu)
         
         let groupingMenu = this.mainMenu.addFolder("MultiObject")
         groupingMenu.open()
@@ -559,16 +554,37 @@ class Mod {
         scaleMapMenu.add(options, "scaleMapZ").name("Z") 
         scaleMapMenu.add(options, "scaleMap").name("Scale")
         
+        /*
+        let transformMenu = otherMenu.addFolder("Transform Map")
+        transformMenu.add(options, "transformMap").name("Transform")
+        */
+        
         let settingsMenu = this.mainMenu.addFolder('Settings')
         settingsMenu.add(options, "degToRad").name("Anti Radians").onChange(t => {this.setSettings('degToRad', t)})      
-        settingsMenu.add(options, "backupMap").name("Auto Backup").onChange(t => {this.setSettings('backupMap', t)})          
+        settingsMenu.add(options, "backupMap").name("Auto Backup").onChange(t => {this.setSettings('backupMap', t)})
+        settingsMenu.add(options, "antiAlias").name("Anti-aliasing").onChange(t => {this.setSettings('antiAlias', t), alert("This change will occur after you refresh")})      
+        settingsMenu.add(options, "highPrecision").name("High Precision").onChange(t => {this.setSettings('highPrecision', t), alert("This change will occur after you refresh")})      
     }
-
+    
+    prefabFolder(prefabs, menu) {
+        let options = {}
+        for (let ob in prefabs) {
+            if (!Array.isArray(prefabs[ob])) {
+                let folder = menu.addFolder(ob)
+                this.prefabFolder(prefabs[ob], folder)
+            } else {
+                options[ob] = (() => this.replaceObject(JSON.stringify(prefabs[ob])))
+                menu.add(options, ob).name(ob + " [" + prefabs[ob].length + "]")
+            }
+        }
+    }
+    
     onLoad() {
         this.setupSettings()
         this.removeAd()
         this.addGui()
         this.addControls()
+        window.onbeforeunload = function() {return true}
     }
 }
 
@@ -590,6 +606,8 @@ GM_xmlhttpRequest({
             .replace(/{(\w+)\[(\w+)\]\=(\w+)}\);this\.objConfigOptions/, '{$1[$2]=$2 == "rot" ? window.mod.degToRad($3) : $3});this.objConfigOptions')
             .replace('{this.removeObject()}', '{window.mod.objectSelected(true) ? window.mod.removeGroup() : this.removeObject()}')
             .replace('{this.duplicateObject()}', '{window.mod.objectSelected(true) ? window.mod.duplicateGroup() : this.duplicateObject()}')
+            .replace(/antialias:!1/g, 'antialias:window.mod.settings.antiAlias ? 1 : !1')
+            .replace(/precision:"mediump"/g, 'precision:window.mod.settings.highPrecision ? "highp": "mediump"')
             
         GM_xmlhttpRequest({
             method: "GET",
