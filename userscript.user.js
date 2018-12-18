@@ -255,6 +255,14 @@ class Mod {
         if (obs.length == 0) return alert('There was nothing to save')
         let nme = prompt("Name your prefab", "");
         if (nme == null || nme == "") return alert('Please name your prefab')
+            
+        let center = this.findCenter(obs)
+        for (let ob of obs) {
+            ob.p[0] -= center[0]
+            ob.p[1] -= center[1]
+            ob.p[2] -= center[2]
+        }
+    
         if (full) 
             obs = {
                 "name": "prefab_" + nme.replace(/ /g,"_"),
