@@ -3,7 +3,7 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      1.9
+// @version      1.9_1
 // @author       Tehchy
 // @match        https://krunker.io/editor.html
 // @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/prefabs.js?v=1.9
@@ -123,6 +123,17 @@ class Mod {
 
     rotateObjects(jsp, deg) {
         //Credit JustProb
+        switch (deg) {
+            case 90: return this.changeAngle(jsp)
+            case 180: return this.reflectAngle(jsp)
+            case 270: return this.reflectAngle(this.changeAngle(jsp))
+            default: return this.rotate3D(jsp, deg)
+        }
+        return jsp
+    }
+
+    rotate3D(jsp, deg) {
+        //Credit JustProb
         deg = this.toRadians(deg - 180)
 
         for (let ob of jsp) {
@@ -148,15 +159,6 @@ class Mod {
             angle =  Math.atan2(-1 * z, x)
         return angle < 0 ? angle + (Math.PI * 2) : angle
     } 
-    
-    rotateObjectsOld(ob, rotation = 90) {
-        switch (rotation) {
-            case 90: return this.changeAngle(ob)
-            case 180: return this.reflectAngle(ob)
-            case 270: return this.reflectAngle(this.changeAngle(ob))
-            default: return ob
-        }
-    }
     
     changeAngle(jsp){
         //Credit JustProb
