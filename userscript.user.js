@@ -3,7 +3,7 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      1.9_1
+// @version      1.9_2
 // @author       Tehchy
 // @match        https://krunker.io/editor.html
 // @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/prefabs.js?v=1.9
@@ -15,11 +15,11 @@ window.stop()
 document.innerHTML = ""
 
 class Mod {
-    constructor(info) {
-        this.info = info
+    constructor(v) {
+        this.version = v
         this.hooks = {
-            object: null,
-            config: null,
+            objectInstance: null,
+            editor: null,
             gui: null,
             three: null
         }
@@ -39,7 +39,7 @@ class Mod {
     }
 
     objectSelected(group = false) {
-        let selected = this.hooks.config.transformControl.object
+        let selected = this.hooks.editor.transformControl.object
         return selected ? (group ? (Object.keys(this.groups).includes(selected.uuid) ? selected : false) : selected) : false
     }
     
@@ -50,14 +50,13 @@ class Mod {
             file.id = 'jsonInput'
             
             let self = this
-            file.addEventListener('change', function(evt) {
-                let files = evt.target.files;
-                if (files.length > 1) return alert('Only 1 file please')
-                if (files.length < 1) return alert('Please select 1 file')
+            file.addEventListener('change', ev => {
+                let files = ev.target.files;
+                if (files.length != 1) return alert('Please select 1 file')
                 let f = files[0]
                 let reader = new FileReader();
 
-                reader.onload = (function(theFile) {
+                reader.onload = (theFile => {
                     return e => {
                         self.replaceObject(e.target.result)
                     };
@@ -79,11 +78,11 @@ class Mod {
     replaceObject(str, fix = false) {
         let selected = this.objectSelected()
         if (!selected) {
-            //this.hooks.config.addObject(this.hooks.object.defaultFromType("CUBE"))
+            //this.hooks.editor.addObject(this.hooks.objectInstance.defaultFromType("CUBE"))
             //selected = this.objectSelected()
         }
         if (selected) {
-            if (!fix) this.hooks.config.removeObject()
+            if (!fix) this.hooks.editor.removeObject()
             
             let jsp = JSON.parse(str);
             jsp = jsp.objects ? jsp.objects : jsp
@@ -104,7 +103,7 @@ class Mod {
                 ob.p[1] += selected.userData.owner.position.y - (selected.scale.y / 2) - center[1]
                 ob.p[2] += selected.userData.owner.position.z - center[2] - (fix ? 0.5 : 0)
                 
-                this.hooks.config.addObject(this.hooks.object.deserialize(ob))
+                this.hooks.editor.addObject(this.hooks.objectInstance.deserialize(ob))
             }
             this.rotation = 0
             this.prefabMenu.__controllers[2].setValue(this.rotation)
@@ -186,7 +185,6 @@ class Mod {
     }
     
     findCenter(jsp) {
-        //Credit JustProb
         let min = jsp[0].p[1],
         xMin = jsp[0].p[0] - (jsp[0].s[0] /2),
         xMax = jsp[0].p[0] + (jsp[0].s[0] /2),
@@ -220,7 +218,7 @@ class Mod {
         }
         let intersect = []
         let obbys = []
-        for (let ob of this.hooks.config.objInstances) {
+        for (let ob of this.hooks.editor.objInstances) {
             if (ob.boundingMesh.uuid == selected.uuid) continue
             if (this.intersect({
                     minX: ob.boundingMesh.position.x - (ob.boundingMesh.scale.x / 2), 
@@ -238,7 +236,7 @@ class Mod {
         if (!group) {
             if (cut && obbys.length && !group) {
                 for (var i = 0; i < obbys.length; i++) {
-                    this.hooks.config.removeObject(obbys[i])
+                    this.hooks.editor.removeObject(obbys[i])
                 }
             }
             
@@ -296,15 +294,15 @@ class Mod {
         let remOb = []
         
         this.groups[selected.uuid].objects.push(selected.uuid)
-        let obs = this.hooks.config.objInstances.filter(ob => this.groups[selected.uuid].objects.includes(ob.boundingMesh.uuid))
-       /* for (var i = 0; i < this.hooks.config.objInstances.length; i++) {
-            if (!this.groups[selected.uuid].objects.includes(this.hooks.config.objInstances[i].boundingMesh.uuid)) continue
+        let obs = this.hooks.editor.objInstances.filter(ob => this.groups[selected.uuid].objects.includes(ob.boundingMesh.uuid))
+       /* for (var i = 0; i < this.hooks.editor.objInstances.length; i++) {
+            if (!this.groups[selected.uuid].objects.includes(this.hooks.editor.objInstances[i].boundingMesh.uuid)) continue
             
-                remOb.push(this.hooks.config.objInstances[i])
+                remOb.push(this.hooks.editor.objInstances[i])
         }*/
             
         for (var i = 0; i < obs.length; i++)
-            this.hooks.config.removeObject(obs[i])
+            this.hooks.editor.removeObject(obs[i])
         
         delete this.groups[selected.uuid]
     }
@@ -325,7 +323,7 @@ class Mod {
                 
             if (diffPos[0] === 0 && diffPos[1] === 0 && diffPos[2] === 0) continue // no changes
             
-            let obs = this.hooks.config.objInstances.filter(ob => group.objects.includes(ob.boundingMesh.uuid))
+            let obs = this.hooks.editor.objInstances.filter(ob => group.objects.includes(ob.boundingMesh.uuid))
 
             for (let ob of obs) {
                 ob.boundingMesh.position.x += diffPos[0]
@@ -343,7 +341,7 @@ class Mod {
         if (!selected) return alert('You cant stop a group that doesnt exist')
         
         delete this.groups[selected.uuid]
-        return this.hooks.config.removeObject(selected.userData.owner)
+        return this.hooks.editor.removeObject(selected.userData.owner)
     }
     
     fixVehicle() {
@@ -351,12 +349,12 @@ class Mod {
     }
     
     spawnPlaceholder() {
-        let pos = this.hooks.config.camera.getWorldPosition()
+        let pos = this.hooks.editor.camera.getWorldPosition()
         let obph = {p: [], s: [10, 10, 10], e: 16777215, o: 0.3, c: 0}
         obph.p[0] = pos.x
         obph.p[1] = pos.y - 10
         obph.p[2] = pos.z
-        this.hooks.config.addObject(this.hooks.object.deserialize(obph))
+        this.hooks.editor.addObject(this.hooks.objectInstance.deserialize(obph))
     }
     
     colorizeMap(input = false, gold = false, rand = false) {
@@ -366,7 +364,7 @@ class Mod {
             
         if (input) input = input.trim().split(',')
 
-        for (let ob of this.hooks.config.objInstances) {
+        for (let ob of this.hooks.editor.objInstances) {
             if (input) ob.color = input.length > 1 ? input[Math.floor(Math.random() * input.length)] : input[0]
             if (gold) ob.color = "#FFDF00", ob.emissive = "#D4AF37"
             if (rand) ob.color = this.getRandomColor()
@@ -388,7 +386,7 @@ class Mod {
             sY = this.mainMenu.__folders["Other Features"].__folders["Scale Map"].__controllers[1].getValue(),
             sZ = this.mainMenu.__folders["Other Features"].__folders["Scale Map"].__controllers[2].getValue()
             
-        for (let ob of this.hooks.config.objInstances) {
+        for (let ob of this.hooks.editor.objInstances) {
             ob.pos[0] *= sX,
             ob.pos[1] *= sY,
             ob.pos[2] *= sZ
@@ -404,7 +402,7 @@ class Mod {
     }
     
     backupMap() {
-        return this.hooks.config.exportMap()
+        return this.hooks.editor.exportMap()
     }
         
     intersect(a, b) {
@@ -414,14 +412,18 @@ class Mod {
     }
 
     addControls() {
+        document.getElementById("exportMap").insertAdjacentHTML('afterend', '<div id="newMap" class="bottomButton">New Map</div>');
         document.getElementById("bottomBar").insertAdjacentHTML('beforeend', '<div class="bottomPanel"><div id="spawnPlaceholder" class="bottomButton">Spawn Placeholder</div></div>');
 
+        document.getElementById("newMap").addEventListener("click", t => {  
+            confirm("Are you sure you want to reset the map?") && this.hooks.editor.clearMap()
+        })
         document.getElementById("spawnPlaceholder").addEventListener("click", t => {  
             this.spawnPlaceholder()
         })
         
         window.addEventListener("keydown", t => {
-            if (!this.hooks.config.isTyping(t))
+            if (!this.hooks.editor.isTyping(t))
                 switch (t.keyCode) {
                     case 67: //ctrl c
                         return t.ctrlKey ? this.copyObjects() : false
@@ -429,6 +431,10 @@ class Mod {
                         return t.ctrlKey ? this.pasteObjects() : false
                     case 70:
                         return t.shiftKey ? this.fixVehicle() : false
+                    case 82:
+                        return t.shiftKey ? this.hooks.editor.duplicateObject() : false
+                    case 80: 
+                        return this.spawnPlaceholder()
                 }
         })
     }
@@ -445,9 +451,9 @@ class Mod {
     degToRad(r) {
         if (!this.settings.degToRad) return r
         return [
-            this.hooks.three.Math.degToRad(r[0]),
-            this.hooks.three.Math.degToRad(r[1]),
-            this.hooks.three.Math.degToRad(r[2]),
+            r[0] * (Math.PI / 180),
+            r[1] * (Math.PI / 180),
+            r[2] * (Math.PI / 180),
         ]
     }
     
@@ -525,7 +531,7 @@ class Mod {
         options.colorizeG = (() => this.colorizeMap(false, true))
         options.colorizeI = (() => this.colorizeMap(prompt("Input colors. (Seperate using a comma)", "")))
         
-        this.mainMenu = this.gui.addFolder("Map Editor Mod v" + this.info.script.version)
+        this.mainMenu = this.gui.addFolder("Map Editor Mod v" + this.version)
         this.mainMenu.open()
         
         this.prefabMenu = this.mainMenu.addFolder("Prefabs")
@@ -608,9 +614,9 @@ GM_xmlhttpRequest({
             .replace('("Ambient Light").listen().onChange', '("Ambient Color").onChange')
             .replace('("Light Color").listen().onChange', '("Light Color").onChange')
             .replace('("Fog Color").listen().onChange', '("Fog Color").onChange')
-            .replace(/(\w+).boundingNoncollidableBoxMaterial=new (.*)}\);const/, '$1.boundingNoncollidableBoxMaterial = new $2 });window.mod.hooks.object = $1;const')
-            //.replace(/(\w+).init\(document.getElementById\("container"\)\)/, '$1.init(document.getElementById("container")), window.mod.hooks.config = $1')
-            .replace(/this\.transformControl\.update\(\)/, 'this.transformControl.update(),window.mod.hooks.config = this,window.mod.loop()')
+            .replace(/(\w+).boundingNoncollidableBoxMaterial=new (.*)}\);const/, '$1.boundingNoncollidableBoxMaterial = new $2 });window.mod.hooks.objectInstance = $1;const')
+            //.replace(/(\w+).init\(document.getElementById\("container"\)\)/, '$1.init(document.getElementById("container")), window.mod.hooks.editor = $1')
+            .replace(/this\.transformControl\.update\(\)/, 'this.transformControl.update(),window.mod.hooks.editor = this,window.mod.loop()')
             .replace(/\[\],(\w+).open\(\),/, '[],$1.open(),window.mod.hooks.gui=$1,')
             .replace(/initScene\(\){this\.scene=new (\w+).Scene,/, 'initScene(){this.scene=new $1.Scene,window.mod.hooks.three = $1,')
             .replace(/{(\w+)\[(\w+)\]\=(\w+)}\);this\.objConfigOptions/, '{$1[$2]=$2 == "rot" ? window.mod.degToRad($3) : $3});this.objConfigOptions')
@@ -624,7 +630,7 @@ GM_xmlhttpRequest({
             url: "https://krunker.io/editor.html",
             onload: res => {
                 let html = res.responseText
-                html = html.replace(' src="js/editor.js">', `>${Mod.toString()}\nwindow.mod = new Mod(${JSON.stringify(GM.info)});\n${code.toString()}`)
+                html = html.replace(' src="js/editor.js">', `>${Mod.toString()}\nwindow.mod = new Mod(${JSON.stringify(GM.info.script.version)});\n${code.toString()}`)
                 document.open()
                 document.write(html)
                 document.close()
