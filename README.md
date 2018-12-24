@@ -11,6 +11,8 @@
 - Ctrl C - Copy Objects
 - Ctrl P - Paste Objects
 - Shift F - Vehicle Fixer
+- Shift R - Duplicate Object
+- P - Spawn placeholder cube
 
 ### Changes:
 - Sky Color, Ambient Light, Light Color and Fog Color can be inputed manually
