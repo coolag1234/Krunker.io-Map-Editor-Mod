@@ -3,10 +3,10 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      2.0
+// @version      2.0_1
 // @author       Tehchy
 // @match        https://krunker.io/editor.html
-// @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/assets.js?v=2.0
+// @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/assets.js?v=2.0_1
 // @grant        GM_xmlhttpRequest
 // @run-at       document-start
 // ==/UserScript==
