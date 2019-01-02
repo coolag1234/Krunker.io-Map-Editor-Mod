@@ -3,10 +3,10 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      2.0_1
+// @version      2.0_2
 // @author       Tehchy
 // @match        https://krunker.io/editor.html
-// @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/assets.js?v=2.0_1
+// @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/assets.js?v=2.0_2
 // @grant        GM_xmlhttpRequest
 // @run-at       document-start
 // ==/UserScript==
@@ -349,12 +349,9 @@ class Mod {
         let selected = this.objectSelected(true)
         if (!selected) return alert('You cant edit a group that doesnt exist')
         let group = this.groups[selected.uuid]
-    
+        let obs = this.hooks.editor.objInstances.filter(ob => group.objects.includes(ob.boundingMesh.uuid))
         switch (change) {
-            case 'texture': 
-                let obs = this.hooks.editor.objInstances.filter(ob => group.objects.includes(ob.boundingMesh.uuid))
-                for (let ob of obs) ob.texture = val
-                break;
+            case 'texture': for (let ob of obs) ob.texture = val; break;
         }
     }
     
@@ -617,7 +614,7 @@ class Mod {
         for (let ob in assets) {
             if (!Array.isArray(assets[ob])) {
                 let folder = menu.addFolder(ob)
-                this.prefabFolder(assets[ob], folder)
+                this.assetFolder(assets[ob], folder)
             } else {
                 options[ob] = (() => this.replaceObject(JSON.stringify(assets[ob])))
                 menu.add(options, ob).name(ob + " [" + assets[ob].length + "]")
