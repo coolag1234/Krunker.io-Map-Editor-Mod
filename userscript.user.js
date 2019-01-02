@@ -3,10 +3,10 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      1.9_2
+// @version      2.0
 // @author       Tehchy
 // @match        https://krunker.io/editor.html
-// @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/prefabs.js?v=1.9
+// @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/assets.js?v=2.0
 // @grant        GM_xmlhttpRequest
 // @run-at       document-start
 // ==/UserScript==
@@ -33,7 +33,7 @@ class Mod {
         this.groups = []
         this.rotation = 0
         this.mainMenu = null
-        this.prefabMenu = null
+        this.assetMenu = null
         this.gui = null
         this.onLoad()
     }
@@ -106,7 +106,7 @@ class Mod {
                 this.hooks.editor.addObject(this.hooks.objectInstance.deserialize(ob))
             }
             this.rotation = 0
-            this.prefabMenu.__controllers[2].setValue(this.rotation)
+            this.assetMenu.__controllers[2].setValue(this.rotation)
         } else {
             alert("You must select a object first")
         }
@@ -253,8 +253,8 @@ class Mod {
     exportObjects(full = false) {
         let obs = this.copyObjects(false, false, true)
         if (obs.length == 0) return alert('There was nothing to save')
-        let nme = prompt("Name your prefab", "");
-        if (nme == null || nme == "") return alert('Please name your prefab')
+        let nme = prompt("Name your asset", "");
+        if (nme == null || nme == "") return alert('Please name your asset')
             
         let center = this.findCenter(obs)
         for (let ob of obs) {
@@ -265,7 +265,7 @@ class Mod {
     
         if (full) 
             obs = {
-                "name": "prefab_" + nme.replace(/ /g,"_"),
+                "name": "asset_" + nme.replace(/ /g,"_"),
                 "modURL":"https://www.dropbox.com/s/4j76kiqemdo6d9a/MMOKBill.zip?dl=0",
                 "ambient":9937064,
                 "light":15923452,
@@ -276,7 +276,7 @@ class Mod {
                 "spawns":[], 
                 "objects": obs
             }
-        this.download(JSON.stringify(obs), 'prefab_' + nme.replace(/ /g,"_") + '.txt', 'text/plain');
+        this.download(JSON.stringify(obs), 'asset_' + nme.replace(/ /g,"_") + '.txt', 'text/plain');
     }
     
     pasteObjects() {
@@ -342,6 +342,20 @@ class Mod {
         
         delete this.groups[selected.uuid]
         return this.hooks.editor.removeObject(selected.userData.owner)
+    }
+    
+    editGroup(change = 'texture', val = null) {
+        if (Object.keys(this.groups).length == 0) return alert('You cant edit a group that doesnt exist')
+        let selected = this.objectSelected(true)
+        if (!selected) return alert('You cant edit a group that doesnt exist')
+        let group = this.groups[selected.uuid]
+    
+        switch (change) {
+            case 'texture': 
+                let obs = this.hooks.editor.objInstances.filter(ob => group.objects.includes(ob.boundingMesh.uuid))
+                for (let ob of obs) ob.texture = val
+                break;
+        }
     }
     
     fixVehicle() {
@@ -518,6 +532,7 @@ class Mod {
         options.copy = (() => this.copyObjects())
         options.cut = (() => this.copyObjects(true))
         options.paste = (() => this.pasteObjects())
+        options.texture = "DEFAULT"
         options.degToRad = this.settings.degToRad
         options.backupMap = this.settings.backupMap
         options.antiAlias = this.settings.antiAlias
@@ -534,15 +549,15 @@ class Mod {
         this.mainMenu = this.gui.addFolder("Map Editor Mod v" + this.version)
         this.mainMenu.open()
         
-        this.prefabMenu = this.mainMenu.addFolder("Prefabs")
-        let prefabs = localStorage.getItem('krunk_prefabs') ? JSON.parse(localStorage.getItem('krunk_prefabs')) : {}
+        this.assetMenu = this.mainMenu.addFolder("Assets")
+        let assets = localStorage.getItem('krunk_assets') ? JSON.parse(localStorage.getItem('krunk_assets')) : {}
         
         options.json = (() => this.jsonInput())
         options.file = (() => this.jsonInput(true))
-        this.prefabMenu.add(options, "json").name("Json Import")
-        this.prefabMenu.add(options, "file").name("File Import")
-        this.prefabMenu.add(options, "rotation", 0, 359, 1).name("Rotation").onChange(t => {this.rotation = t})  
-        this.prefabFolder(prefabs, this.prefabMenu)
+        this.assetMenu.add(options, "json").name("Json Import")
+        this.assetMenu.add(options, "file").name("File Import")
+        this.assetMenu.add(options, "rotation", 0, 359, 1).name("Rotation").onChange(t => {this.rotation = t})  
+        this.assetFolder(assets, this.assetMenu)
         
         let groupingMenu = this.mainMenu.addFolder("MultiObject")
         groupingMenu.open()
@@ -551,6 +566,21 @@ class Mod {
         groupingMenu.add(options, "copy").name("Copy")
         groupingMenu.add(options, "cut").name("Cut")
         groupingMenu.add(options, "paste").name("Paste")
+        
+        let editMenu = groupingMenu.addFolder("Edit")
+        let textures = {
+            Default: "DEFAULT",
+            Wall: "WALL",
+            Dirt: "DIRT",
+            Floor: "FLOOR",
+            Grid: "GRID",
+            Grey: "GREY",
+            Roof: "ROOF",
+            Flag: "FLAG",
+        };
+        editMenu.add(options, "texture").options(textures).name("Texture").listen().onChange(t => {
+            this.editGroup('texture', t);
+        })
         
         let exportMenu = groupingMenu.addFolder("Export")
         
@@ -582,15 +612,15 @@ class Mod {
         settingsMenu.add(options, "highPrecision").name("High Precision").onChange(t => {this.setSettings('highPrecision', t), alert("This change will occur after you refresh")})      
     }
     
-    prefabFolder(prefabs, menu) {
+    assetFolder(assets, menu) {
         let options = {}
-        for (let ob in prefabs) {
-            if (!Array.isArray(prefabs[ob])) {
+        for (let ob in assets) {
+            if (!Array.isArray(assets[ob])) {
                 let folder = menu.addFolder(ob)
-                this.prefabFolder(prefabs[ob], folder)
+                this.prefabFolder(assets[ob], folder)
             } else {
-                options[ob] = (() => this.replaceObject(JSON.stringify(prefabs[ob])))
-                menu.add(options, ob).name(ob + " [" + prefabs[ob].length + "]")
+                options[ob] = (() => this.replaceObject(JSON.stringify(assets[ob])))
+                menu.add(options, ob).name(ob + " [" + assets[ob].length + "]")
             }
         }
     }
