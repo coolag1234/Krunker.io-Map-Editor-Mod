@@ -3,7 +3,7 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      2.0_2
+// @version      2.1
 // @author       Tehchy
 // @match        https://krunker.io/editor.html
 // @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/assets.js?v=2.0_2
@@ -28,6 +28,10 @@ class Mod {
             backupMap: false,
             antiAlias: false,
             highPrecision: false,
+            gridVisibility: true,
+            gridOpacity: .25,
+            gridSize: 100,
+            gridDivisions: 10,
         }
         this.copy = null
         this.groups = []
@@ -480,6 +484,9 @@ class Mod {
     
     loop() {
         this.checkGroup()
+        
+        this.hooks.editor.gridHelper.visible = this.settings.gridVisibility;
+        this.hooks.editor.gridHelper.material.opacity = this.settings.gridOpacity;
     }
 
     removeAd() {//Sorry Sidney it blocks my second GUI
@@ -542,6 +549,10 @@ class Mod {
         options.colorizeR = (() => this.colorizeMap(false, false, true))
         options.colorizeG = (() => this.colorizeMap(false, true))
         options.colorizeI = (() => this.colorizeMap(prompt("Input colors. (Seperate using a comma)", "")))
+        options.gridVisibility = this.settings.gridVisibility
+        options.gridOpacity = this.settings.gridOpacity
+        options.gridDivisions = this.settings.gridDivisions
+        options.gridSize = this.settings.gridSize
         
         this.mainMenu = this.gui.addFolder("Map Editor Mod v" + this.version)
         this.mainMenu.open()
@@ -606,7 +617,13 @@ class Mod {
         settingsMenu.add(options, "degToRad").name("Anti Radians").onChange(t => {this.setSettings('degToRad', t)})      
         settingsMenu.add(options, "backupMap").name("Auto Backup").onChange(t => {this.setSettings('backupMap', t)})
         settingsMenu.add(options, "antiAlias").name("Anti-aliasing").onChange(t => {this.setSettings('antiAlias', t), alert("This change will occur after you refresh")})      
-        settingsMenu.add(options, "highPrecision").name("High Precision").onChange(t => {this.setSettings('highPrecision', t), alert("This change will occur after you refresh")})      
+        settingsMenu.add(options, "highPrecision").name("High Precision").onChange(t => {this.setSettings('highPrecision', t), alert("This change will occur after you refresh")}) 
+
+        let gridMenu = settingsMenu.addFolder('Grid')
+        gridMenu.add(options, "gridVisibility").name("Visible").onChange(t => {this.setSettings('gridVisibility', t)})      
+        gridMenu.add(options, "gridOpacity", 0.05, 1, 0.05).name("Opacity").onChange(t => {this.setSettings('gridOpacity', t)})
+        gridMenu.add(options, "gridSize", 100, 1000, 50).name("Size").onChange(t => {this.setSettings('gridSize', t)})      
+        gridMenu.add(options, "gridDivisions").name("Divisions").onChange(t => {this.setSettings('gridDivisions', t)}) 
     }
     
     assetFolder(assets, menu) {
@@ -651,6 +668,7 @@ GM_xmlhttpRequest({
             .replace('{this.duplicateObject()}', '{window.mod.objectSelected(true) ? window.mod.duplicateGroup() : this.duplicateObject()}')
             .replace(/antialias:!1/g, 'antialias:window.mod.settings.antiAlias ? 1 : !1')
             .replace(/precision:"mediump"/g, 'precision:window.mod.settings.highPrecision ? "highp": "mediump"')
+            .replace(/GridHelper\(100,10\)/, 'GridHelper(window.mod.settings.gridSize, window.mod.settings.gridDivisions)')
             
         GM_xmlhttpRequest({
             method: "GET",
