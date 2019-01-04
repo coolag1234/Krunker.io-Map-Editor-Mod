@@ -3,7 +3,7 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      2.1
+// @version      2.2
 // @author       Tehchy
 // @match        https://krunker.io/editor.html
 // @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/assets.js?v=2.0_2
@@ -250,7 +250,15 @@ class Mod {
                 this.copy = JSON.stringify(intersect)
             }
         } else {
-            this.groups[selected.uuid] = {owner: selected, pos: {x: selected.position.x, y: selected.position.y, z: selected.position.z}, objects: intersect}
+            selected.userData.owner.emissive = 16777215
+            selected.userData.owner.opacity = 0.5
+            selected.userData.owner.color = 0
+            this.groups[selected.uuid] = {
+                owner: selected, 
+                pos: {x: selected.position.x, y: selected.position.y, z: selected.position.z}, 
+                scale: {x: selected.scale.x, y: selected.scale.y, z: selected.scale.z},
+                objects: intersect
+            }
         }
     }
     
@@ -313,39 +321,91 @@ class Mod {
     
     duplicateGroup() {
         if (Object.keys(this.groups).length == 0) return
-        return //later
+
+        let selected = this.objectSelected(true)
+        if (!selected) return alert('You cant duplicate a group that doesnt exist')
+            
+        let group = this.groups[selected.uuid]
+        let obs = this.hooks.editor.objInstances.filter(ob => group.objects.includes(ob.boundingMesh.uuid))
+        let newObs = [];
+        
+        for (let ob of obs) {
+            let newOb = this.hooks.objectInstance.deserialize(ob.serialize())
+            newObs.push(newOb.boundingMesh.uuid)
+            this.hooks.editor.addObject(newOb)
+        }
+        
+        let groupBox = this.hooks.objectInstance.deserialize(selected.userData.owner.serialize())
+        this.hooks.editor.addObject(groupBox)
+        
+        selected = this.objectSelected()
+        this.groups[selected.uuid] = {
+            owner: selected, 
+            pos: {x: selected.position.x, y: selected.position.y, z: selected.position.z},
+            scale: {x: selected.scale.x, y: selected.scale.y, z: selected.scale.z},
+            objects: newObs
+        }
     }
     
     checkGroup() {
         if (Object.keys(this.groups).length == 0) return
         
         for (var uuid in this.groups) {
-            let group = this.groups[uuid],
-                currPos = group.owner.position,
+            let group = this.groups[uuid]
+            
+            //Position Change Check
+            let currPos = group.owner.position,
                 oldPos = group.pos,
-                diffPos = [currPos.x - oldPos.x, currPos.y - oldPos.y, currPos.z - oldPos.z]
+                diffPos = [currPos.x - oldPos.x, currPos.y - oldPos.y, currPos.z - oldPos.z],
+                changedPos = !(diffPos[0] === 0 && diffPos[1] === 0 && diffPos[2] === 0)
+            
+            //Scale Change Check
+            let currScale = group.owner.scale,
+                oldScale = group.scale,
+                diffScale = [(currScale.x / oldScale.x) , (currScale.y  / oldScale.y), (currScale.z / oldScale.z)],
+                changedScale = !(diffScale[0] === 1 && diffScale[1] === 1 && diffScale[2] === 1)
                 
-            if (diffPos[0] === 0 && diffPos[1] === 0 && diffPos[2] === 0) continue // no changes
+            if (!changedPos && !changedScale) continue // no changes
             
             let obs = this.hooks.editor.objInstances.filter(ob => group.objects.includes(ob.boundingMesh.uuid))
 
             for (let ob of obs) {
-                ob.boundingMesh.position.x += diffPos[0]
-                ob.boundingMesh.position.y += diffPos[1]
-                ob.boundingMesh.position.z += diffPos[2]
+                if (changedScale) {
+                    ob.boundingMesh.position.x *= diffScale[0]
+                    ob.boundingMesh.position.y *= diffScale[1]
+                    ob.boundingMesh.position.z *= diffScale[2]
+                    
+                    ob.boundingMesh.scale.x *= diffScale[0]
+                    ob.boundingMesh.scale.y *= diffScale[1]
+                    ob.boundingMesh.scale.z *= diffScale[2]
+                } else {
+                    ob.boundingMesh.position.x += diffPos[0]
+                    ob.boundingMesh.position.y += diffPos[1]
+                    ob.boundingMesh.position.z += diffPos[2]
+                }
             }
+            
             this.groups[group.owner.uuid].pos = {x: currPos.x, y: currPos.y, z: currPos.z}
+            this.groups[group.owner.uuid].scale = {x: currScale.x, y: currScale.y, z: currScale.z}
         }
     }
     
-    stopGrouping() {
+    stopGrouping(all = false) {
         if (Object.keys(this.groups).length == 0) return alert('You cant stop a group that doesnt exist')
             
-        let selected = this.objectSelected(true)
-        if (!selected) return alert('You cant stop a group that doesnt exist')
-        
-        delete this.groups[selected.uuid]
-        return this.hooks.editor.removeObject(selected.userData.owner)
+        if (all) {
+            let obs = this.hooks.editor.objInstances.filter(ob => Object.keys(this.groups).includes(ob.boundingMesh.uuid))
+            for (let ob of obs) {
+                this.hooks.editor.removeObject(ob)
+            }
+            this.groups = []
+        } else {
+            let selected = this.objectSelected(true)
+            if (!selected) return alert('You cant stop a group that doesnt exist')
+            
+            delete this.groups[selected.uuid]
+            return this.hooks.editor.removeObject(selected.userData.owner)
+        }
     }
     
     editGroup(change = 'texture', val = null) {
@@ -402,13 +462,18 @@ class Mod {
             sZ = this.mainMenu.__folders["Other Features"].__folders["Scale Map"].__controllers[2].getValue()
             
         for (let ob of this.hooks.editor.objInstances) {
-            ob.pos[0] *= sX,
-            ob.pos[1] *= sY,
-            ob.pos[2] *= sZ
+            let pos = ob.pos, size = ob.size
+            
+            pos[0] *= sX
+            pos[1] *= sY
+            pos[2] *= sZ
 
-            ob.size[0] *= sX,
-            ob.size[1] *= sY,
-            ob.size[2] *= sZ
+            size[0] *= sX
+            size[1] *= sY
+            size[2] *= sZ
+            
+            ob.size = size
+            ob.pos = pos
         }
     }
     
@@ -531,6 +596,7 @@ class Mod {
         let options = {rotation: 0}
         options.create = (() => this.copyObjects(false, true))
         options.stop = (() => this.stopGrouping())
+        options.stopAll = (() => this.stopGrouping(true))
         options.exportObj = (() => this.exportObjects())
         options.exportFull = (() => this.exportObjects(true))
         options.copy = (() => this.copyObjects())
@@ -571,6 +637,7 @@ class Mod {
         groupingMenu.open()
         groupingMenu.add(options, "create").name("Create Group") 
         groupingMenu.add(options, "stop").name("Stop Group") 
+        groupingMenu.add(options, "stopAll").name("Stop All Groups") 
         groupingMenu.add(options, "copy").name("Copy")
         groupingMenu.add(options, "cut").name("Cut")
         groupingMenu.add(options, "paste").name("Paste")
