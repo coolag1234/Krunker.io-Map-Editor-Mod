@@ -3,7 +3,7 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      2.2
+// @version      2.3
 // @author       Tehchy
 // @match        https://krunker.io/editor.html
 // @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/assets.js?v=2.0_2
@@ -736,6 +736,9 @@ GM_xmlhttpRequest({
             .replace(/antialias:!1/g, 'antialias:window.mod.settings.antiAlias ? 1 : !1')
             .replace(/precision:"mediump"/g, 'precision:window.mod.settings.highPrecision ? "highp": "mediump"')
             .replace(/GridHelper\(100,10\)/, 'GridHelper(window.mod.settings.gridSize, window.mod.settings.gridDivisions)')
+            .replace(/addObject\((\w+)\){/, 'addObject($1, multi=false){')
+            .replace(/(this\.scene\.add\(.+\.arrowHelper\)),(this\.attachTransform\(.+\.boundingMesh\))/, '$1; if(!multi)$2')
+            .replace(/this\.addObject\((\w+\.deserialize\(\w+\))\);/, 'this.addObject($1, true);')
             
         GM_xmlhttpRequest({
             method: "GET",
