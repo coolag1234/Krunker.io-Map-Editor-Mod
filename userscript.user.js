@@ -3,7 +3,7 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      2.4
+// @version      2.4_1
 // @author       Tehchy
 // @match        https://krunker.io/editor.html
 // @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/assets.js?v=2.0_2
@@ -32,7 +32,7 @@ class Mod {
             gridOpacity: .25,
             gridSize: 100,
             gridDivisions: 10,
-            objectHighlight: true,
+            objectHighlight: false,
         }
         this.intersected = null
         this.voxelSize = 10
