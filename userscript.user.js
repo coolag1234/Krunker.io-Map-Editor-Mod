@@ -3,7 +3,7 @@
 // @description  Krunker.io Map Editor Mod
 // @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
 // @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      2.3
+// @version      2.4
 // @author       Tehchy
 // @match        https://krunker.io/editor.html
 // @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/assets.js?v=2.0_2
@@ -32,7 +32,10 @@ class Mod {
             gridOpacity: .25,
             gridSize: 100,
             gridDivisions: 10,
+            objectHighlight: true,
         }
+        this.intersected = null
+        this.voxelSize = 10
         this.copy = null
         this.groups = []
         this.rotation = 0
@@ -47,39 +50,42 @@ class Mod {
         return selected ? (group ? (Object.keys(this.groups).includes(selected.uuid) ? selected : false) : selected) : false
     }
     
+    loadFile(callback, args = null) {
+        let file = document.createElement('input')
+        file.type = 'file'
+        file.id = 'jsonInput'
+        
+        let self = this
+        file.addEventListener('change', ev => {
+            if (ev.target.files.length != 1) return alert('Please select 1 file')
+            let f = ev.target.files[0]
+            let reader = new FileReader();
+
+            reader.onload = (theFile => {
+                return e => {
+                    self[callback](e.target.result, args)
+                };
+            })(f);
+
+            reader.readAsText(f);
+        }, false);
+        
+        file.type = 'file'
+        file.id = 'jsonInput'
+        file.click()
+        
+        return
+    }
+    
     jsonInput(fromfile = false) {
         if (fromfile) {
-            let file = document.createElement('input')
-            file.type = 'file'
-            file.id = 'jsonInput'
-            
-            let self = this
-            file.addEventListener('change', ev => {
-                let files = ev.target.files;
-                if (files.length != 1) return alert('Please select 1 file')
-                let f = files[0]
-                let reader = new FileReader();
-
-                reader.onload = (theFile => {
-                    return e => {
-                        self.replaceObject(e.target.result)
-                    };
-                })(f);
-
-                reader.readAsText(f);
-            }, false);
-            
-            file.type = 'file'
-            file.id = 'jsonInput'
-            file.click()
-            
-            return
+            return this.loadFile('replaceObject', true);
         }
         let json = prompt("Import Object Json", "");
-        if (json != null && json != "" && this.objectSelected()) this.replaceObject(json)
+        if (json != null && json != "" && this.objectSelected()) this.replaceObject(json, true)
     }
 
-    replaceObject(str, fix = false) {
+    replaceObject(str, skip = false, fix = false) {
         let selected = this.objectSelected()
         if (!selected) {
             //this.hooks.editor.addObject(this.hooks.objectInstance.defaultFromType("CUBE"))
@@ -107,10 +113,10 @@ class Mod {
                 ob.p[1] += selected.userData.owner.position.y - (selected.scale.y / 2) - center[1]
                 ob.p[2] += selected.userData.owner.position.z - center[2] - (fix ? 0.5 : 0)
                 
-                this.hooks.editor.addObject(this.hooks.objectInstance.deserialize(ob))
+                this.hooks.editor.addObject(this.hooks.objectInstance.deserialize(ob), skip)
             }
             this.rotation = 0
-            this.assetMenu.__controllers[2].setValue(this.rotation)
+            this.assetMenu.__controllers[0].setValue(this.rotation)
         } else {
             alert("You must select a object first")
         }
@@ -205,6 +211,15 @@ class Mod {
         }
 
         return [Math.round((xMin + xMax)/2), min, Math.round((yMin + yMax)/2)]
+    }
+    
+    applyCenter(objects) {
+        let center = this.findCenter(objects);
+        for(ob of objects){
+            ob.p[0] -= center[0];
+            ob.p[1] -= center[1];
+            ob.p[2] -= center[2];
+        }
     }
     
     copyObjects(cut = false, group = false, ret = false) {
@@ -416,11 +431,12 @@ class Mod {
         let obs = this.hooks.editor.objInstances.filter(ob => group.objects.includes(ob.boundingMesh.uuid))
         switch (change) {
             case 'texture': for (let ob of obs) ob.texture = val; break;
+            case 'color': for (let ob of obs) ob.color = val; break;
         }
     }
     
     fixVehicle() {
-        this.replaceObject('[{"p":[0,0,0],"s":[47,9,17],"v":1},{"p":[5,9,0],"s":[26,6,17],"v":1}]', true)
+        this.replaceObject('[{"p":[0,0,0],"s":[47,9,17],"v":1},{"p":[5,9,0],"s":[26,6,17],"v":1}]', false, true)
     }
     
     spawnPlaceholder() {
@@ -476,6 +492,199 @@ class Mod {
             ob.pos = pos
         }
     }
+  
+    convertVoxel(str, insert = false) {
+        if (insert && ! this.objectSelected()) return alert('Select a object to replace first')
+        //try {
+            let voxels = JSON.parse(str)
+            let mapout = {"name":"modmap","modURL":"","ambient":9937064,"light":15923452,"sky":14477549,"fog":9280160,"fogD":900,"camPos":[0,0,0],"spawns":[],"objects":[]};
+            let vlist = [];
+            for (let vx of voxels.voxels) 
+                vlist.push([parseInt(vx.x), parseInt(vx.y), parseInt(vx.z)])
+
+            vlist = vlist.sort((a, b) => {
+                let retVal = 0;
+                if (a[1] != b[1]) retVal = a[1] > b[1]? 1 : -1;
+                else if (a[2] != b[2]) retVal = a[2] > b[2]? 1 : -1;
+                else if (a[0] != b[0]) retVal = a[0] > b[0]? 1 : -1;
+                return retVal;
+            });
+
+            for (let voxel of vlist) 
+                mapout.objects.push(this.voxelToObject(voxel))
+
+            mapout.objects = this.mergeVoxels(mapout.objects)
+            if (insert) this.replaceObject(JSON.stringify(mapout.objects));
+            if (!insert) this.download(JSON.stringify(mapout), 'convertedVoxels.txt', 'text/plain');
+        //} catch (e) {
+            //console.log(e);
+            //alert("Failed to load voxels:\n" + e.toString());
+        //}
+        
+    }
+
+    convert(insert = false) {
+        return alert('Still a WIP');
+        this.loadFile('convertVoxel', insert)
+    }
+
+    voxelToObject(voxel) {
+        return {
+            'p': [
+                parseInt(voxel[0]) * this.voxelSize, 
+                parseInt(voxel[1]) * this.voxelSize, 
+                parseInt(voxel[2]) * this.voxelSize
+            ], 
+            's': [this.voxelSize, this.voxelSize, this.voxelSize]
+        };
+    }
+
+    mergeVoxels(objs) {
+        console.log('Merging Y');
+        while (true) {
+            let objectsMerged = 0
+            for (let obj of objs) {
+                let voxelAbove = this.searchObjects(objs, [obj.p[0], obj.p[1] + obj.s[1], obj.p[2]])
+                if (voxelAbove != -1) {
+                    obj.s[1] += objs[voxelAbove].s[1]
+                    objs.pop(voxelAbove)
+                    objectsMerged++
+                }
+            }
+            if (objectsMerged == 0) break
+        }
+        console.log('Merging X');
+        while (true) {
+            let objectsMerged = 0
+            for (let obj of objs) {
+                let searchPos = obj.p[0]
+                searchPos += this.voxelSize
+                let voxelRight = this.searchObjects(objs, [searchPos, obj.p[1], obj.p[2]])
+                while (voxelRight != -1) {
+                    let objRight = objs[voxelRight]
+                    if (objRight.s[1] == obj.s[1]) {
+                        obj.s[0] += objRight.s[0]
+                        obj.p[0] += parseInt(objRight.s[0] / 2)
+                        objs.pop(voxelRight)
+                        objectsMerged++
+                    } else
+                        break
+
+                    searchPos += this.voxelSize
+                    voxelRight = this.searchObjects(objs, [searchPos, obj.p[1], obj.p[2]])
+                }
+            }
+            if (objectsMerged == 0) break
+        }
+        console.log('Merging Z');
+        while (true) {
+            let objectsMerged = 0
+            for (let obj of objs) {
+                let searchPos = obj.p[2]
+                searchPos += this.voxelSize
+                let voxelFoward = this.searchObjects(objs, [obj.p[0], obj.p[1], searchPos])
+                while (voxelFoward != -1) {
+
+                    if (obj.p[0] == 210 && obj.p[2] > 100 && obj.p[1] == 50) {
+                        //debug?
+                        alert('error')
+                    }
+
+                    let objFoward = objs[voxelFoward]
+                    if (objFoward.s[1] == obj.s[1] && objFoward.s[0] == obj.s[0]) {
+                        obj.s[2] += objFoward.s[2]
+                        obj.p[2] += parseInt(objFoward.s[2] / 2)
+                        objs.pop(voxelFoward)
+                        objectsMerged++
+                    } else
+                        break;
+                    
+                    searchPos += this.voxelSize
+                    voxelFoward = this.searchObjects(objs, [obj.p[0], obj.p[1], searchPos])
+                }
+            }
+            if (objectsMerged == 0) break;
+        }
+        return objs;
+    }
+
+    searchObjects(objs, pos) {
+        let min = 0;
+        let max = objs.length - 1;
+        let guessIndex = parseInt(max/2);
+        let guessPos = objs[guessIndex].p;
+        while (JSON.stringify(guessPos) != JSON.stringify(pos)) {
+            if (guessPos[1] > pos[1]) {
+                max = guessIndex - 1
+            } else if (guessPos[1] < pos[1]) {
+                min = guessIndex + 1
+            } else if (guessPos[2] > pos[2]) {
+                max = guessIndex - 1
+            } else if (guessPos[2] < pos[2]) {
+                min = guessIndex + 1
+            } else if (guessPos[0] > pos[0]) {
+                max = guessIndex - 1
+            } else if (guessPos[0] < pos[0]) {
+                min = guessIndex + 1
+            }
+            if(max < min) return -1;
+            
+            guessIndex = parseInt((min + max) / 2);
+            guessPos = objs[guessIndex].p;
+        }
+        return guessIndex;
+    }
+    
+    textToObjects() {
+        let input = prompt("Input text", "");
+        if (input != false && (input == null || input == "")) return alert("Please input proper text")
+        input = input.toLowerCase();
+        let alphabet = {
+            'a': [{"p":[-3,0,0],"s":[1,8,1]},{"p":[3,0,0],"s":[1,8,1]},{"p":[0,8,0],"s":[5,1,1]},{"p":[0,4,0],"s":[5,1,1]}],
+            'b': [{"p":[-3,0,0],"s":[1,9,1]},{"p":[3,5,0],"s":[1,3,1]},{"p":[0,8,0],"s":[5,1,1]},{"p":[0,4,0],"s":[5,1,1]},{"p":[0,0,0],"s":[5,1,1]},{"p":[3,1,0],"s":[1,3,1]}],
+            'c': [{"p":[-3,1,0],"s":[1,7,1]},{"p":[0,8,0],"s":[5,1,1]},{"p":[0,0,0],"s":[5,1,1]},{"p":[3,8,0],"s":[1,1,1]},{"p":[3,0,0],"s":[1,1,1]}],
+            'd': [{"p":[-3,0,0],"s":[1,9,1]},{"p":[0,8,0],"s":[5,1,1]},{"p":[0,0,0],"s":[5,1,1]},{"p":[3,1,0],"s":[1,7,1]}],
+            'e': [{"p":[-3,0,0],"s":[1,9,1]},{"p":[0,8,0],"s":[5,1,1]},{"p":[0,0,0],"s":[5,1,1]},{"p":[0,4,0],"s":[5,1,1]},{"p":[3,8,0],"s":[1,1,1]},{"p":[3,4,0],"s":[1,1,1]},{"p":[3,0,0],"s":[1,1,1]}],
+            'f': [{"p":[-3,0,0],"s":[1,9,1]},{"p":[0,8,0],"s":[5,1,1]},{"p":[0,4,0],"s":[5,1,1]},{"p":[3,8,0],"s":[1,1,1]},{"p":[3,4,0],"s":[1,1,1]}],
+            'g': [{"p":[-3,1,0],"s":[1,7,1]},{"p":[0,8,0],"s":[5,1,1]},{"p":[0,0,0],"s":[5,1,1]},{"p":[3,8,0],"s":[1,1,1]},{"p":[3,0,0],"s":[1,4,1]},{"p":[1,3,0],"s":[3,1,1]}],
+            'h': [{"p":[-3,0,0],"s":[1,9,1]},{"p":[0,4,0],"s":[5,1,1]},{"p":[3,0,0],"s":[1,9,1]}],
+            'i': [{"p":[0,8,0],"s":[7,1,1]},{"p":[0,1,0],"s":[1,7,1]},{"p":[0,0,0],"s":[7,1,1]}],
+            'j': [{"p":[0,8,0],"s":[5,1,1]},{"p":[3,1,0],"s":[1,8,1]},{"p":[1,0,0],"s":[3,1,1]},{"p":[-2,2,0],"s":[1,1,1]},{"p":[-1,1,0],"s":[1,1,1]},{"p":[-3,8,0],"s":[1,1,1]}],
+            'k': [{"p":[-1,5,0],"s":[3,1,1]},{"p":[-3,0,0],"s":[1,9,1]},{"p":[1,4,0],"s":[3,1,1]},{"p":[1,6,0],"s":[1,2,1]},{"p":[2,8,0],"s":[1,1,1]},{"p":[3,8,0],"s":[1,1,1]},{"p":[3,0,0],"s":[1,4,1]}],
+            'l': [{"p":[-3,0,0],"s":[1,9,1]},{"p":[0,0,0],"s":[5,1,1]},{"p":[3,0,0],"s":[1,1,1]}],
+            'm': [{"p":[-3,0,0],"s":[1,8,1]},{"p":[0,0,0],"s":[1,6,1]},{"p":[3,0,0],"s":[1,8,1]},{"p":[-2,8,0],"s":[1,1,1]},{"p":[2,8,0],"s":[1,1,1]},{"p":[-1,6,0],"s":[1,2,1]},{"p":[1,6,0],"s":[1,2,1]}],
+            'n': [{"p":[-3,0,0],"s":[1,9,1]},{"p":[3,0,0],"s":[1,9,1]},{"p":[-2,7,0],"s":[1,1,1]},{"p":[-1,5,0],"s":[1,2,1]},{"p":[0,4,0],"s":[1,1,1]},{"p":[1,2,0],"s":[1,2,1]},{"p":[2,1,0],"s":[1,1,1]}],
+            'o': [{"p":[-3,1,0],"s":[1,7,1]},{"p":[3,1,0],"s":[1,7,1]},{"p":[0,8,0],"s":[5,1,1]},{"p":[0,0,0],"s":[5,1,1]}],
+            'p': [{"p":[-3,0,0],"s":[1,8,1]},{"p":[3,5,0],"s":[1,3,1]},{"p":[0,8,0],"s":[5,1,1]},{"p":[0,4,0],"s":[5,1,1]}],
+            'q': [{"p":[-3,1,0],"s":[1,7,1]},{"p":[3,1,0],"s":[1,7,1]},{"p":[0,8,0],"s":[5,1,1]},{"p":[0,0,0],"s":[5,1,1]},{"p":[2,1,0],"s":[1,1,1]},{"p":[1,1,0],"s":[1,2,1]},{"p":[0,2,0],"s":[1,3,1]}],
+            'r': [{"p":[-3,0,0],"s":[1,8,1]},{"p":[3,6,0],"s":[1,2,1]},{"p":[0,8,0],"s":[5,1,1]},{"p":[2,5,0],"s":[1,1,1]},{"p":[3,5,0],"s":[1,1,1]},{"p":[-1,4,0],"s":[3,1,1]},{"p":[1,4,0],"s":[1,1,1]},{"p":[2,3,0],"s":[1,1,1]},{"p":[3,0,0],"s":[1,3,1]}],
+            's': [{"p":[-3,5,0],"s":[1,3,1]},{"p":[0,8,0],"s":[5,1,1]},{"p":[3,8,0],"s":[1,1,1]},{"p":[0,4,0],"s":[5,1,1]},{"p":[3,1,0],"s":[1,3,1]},{"p":[0,0,0],"s":[5,1,1]},{"p":[-3,0,0],"s":[1,1,1]}],
+            't': [{"p":[0,0,0],"s":[1,8,1]},{"p":[0,8,0],"s":[7,1,1]}],
+            'u': [{"p":[3,1,0],"s":[1,8,1]},{"p":[0,0,0],"s":[5,1,1]},{"p":[-3,1,0],"s":[1,8,1]}],
+            'v': [{"p":[0,0,0],"s":[1,1,1]},{"p":[1,1,0],"s":[1,2,1]},{"p":[2,3,0],"s":[1,3,1]},{"p":[3,6,0],"s":[1,3,1]},{"p":[-1,1,0],"s":[1,2,1]},{"p":[-2,3,0],"s":[1,3,1]},{"p":[-3,6,0],"s":[1,3,1]}],
+            'w': [{"p":[2,0,0],"s":[1,1,1]},{"p":[1,1,0],"s":[1,2,1]},{"p":[0,3,0],"s":[1,6,1]},{"p":[3,1,0],"s":[1,8,1]},{"p":[-1,1,0],"s":[1,2,1]},{"p":[-3,1,0],"s":[1,8,1]},{"p":[-2,0,0],"s":[1,1,1]}],
+            'x': [{"p":[2,2,0],"s":[1,1,1]},{"p":[1,3,0],"s":[1,1,1]},{"p":[0,4,0],"s":[1,1,1]},{"p":[3,0,0],"s":[1,2,1]},{"p":[-1,3,0],"s":[1,1,1]},{"p":[-3,0,0],"s":[1,2,1]},{"p":[-2,2,0],"s":[1,1,1]},{"p":[1,5,0],"s":[1,1,1]},{"p":[-1,5,0],"s":[1,1,1]},{"p":[2,6,0],"s":[1,1,1]},{"p":[-2,6,0],"s":[1,1,1]},{"p":[3,7,0],"s":[1,2,1]},{"p":[-3,7,0],"s":[1,2,1]}],
+            'y': [{"p":[0,0,0],"s":[1,5,1]},{"p":[1,5,0],"s":[1,1,1]},{"p":[-1,5,0],"s":[1,1,1]},{"p":[2,6,0],"s":[1,1,1]},{"p":[-2,6,0],"s":[1,1,1]},{"p":[3,7,0],"s":[1,2,1]},{"p":[-3,7,0],"s":[1,2,1]}],
+            'z': [{"p":[0,0,0],"s":[7,1,1]},{"p":[-3,1,0],"s":[1,1,1]},{"p":[-2,2,0],"s":[1,1,1]},{"p":[-1,3,0],"s":[1,1,1]},{"p":[0,4,0],"s":[1,1,1]},{"p":[1,5,0],"s":[1,1,1]},{"p":[2,6,0],"s":[1,1,1]},{"p":[3,7,0],"s":[1,1,1]},{"p":[0,8,0],"s":[7,1,1]}]
+        };
+        let posX = 0, posY = 0;
+        let objects = [];
+        for (let chr of input) {
+            if (chr == " ") posX += 5;
+            if (chr == ".") posX = 0, posY -= 11;
+            if (chr in alphabet) {
+                let asset = JSON.parse(JSON.stringify(alphabet[chr])); // Stop from editing alphabet assets
+                for (let ob of asset) {
+                    ob.p[0] += posX;
+                    ob.p[1] += posY; 
+                    objects.push(ob);
+                }
+                posX += 9; 
+            }
+        }
+        //return objects;
+        this.replaceObject(JSON.stringify(objects), true)
+    }
     
     transformMap() {
         return alert('This will be functional in a later update')
@@ -489,6 +698,32 @@ class Mod {
         return (a.minX <= b.maxX && a.maxX >= b.minX) &&
             (a.minY <= b.maxY && a.maxY >= b.minY) &&
             (a.minZ <= b.maxZ && a.maxZ >= b.minZ);
+    }
+    
+    onMouseMove(event) {
+        if (!window.mod.settings.objectHighlight) {
+            if (window.mod.intersected) {
+                window.mod.intersected.defaultMaterial.emissive.setHex(window.mod.intersected.currentHex);
+                window.mod.intersected = null
+            }
+            return;
+        }
+        if (!window.mod.hooks.three) return; //not ready yet
+        let t = new window.mod.hooks.three.Vector2(event.clientX / window.innerWidth * 2 - 1, -event.clientY / window.innerHeight * 2 + 1);
+        window.mod.hooks.editor.raycaster.setFromCamera(t, window.mod.hooks.editor.camera);
+        let e = window.mod.hooks.editor.raycaster.intersectObjects(window.mod.hooks.editor.boundingMeshes);
+        if (e.length > 0) {
+            let object = e[0].object.userData.owner;
+            if (window.mod.intersected != object) {
+                if (window.mod.intersected) window.mod.intersected.defaultMaterial.emissive.setHex(window.mod.intersected.currentHex);
+                window.mod.intersected = object;
+                window.mod.intersected.currentHex = window.mod.intersected.defaultMaterial.emissive.getHex();
+                window.mod.intersected.defaultMaterial.emissive.setHex(Math.random() * 0xff00000 - 0xff00000);
+            }
+        } else {
+            if (window.mod.intersected) window.mod.intersected.defaultMaterial.emissive.setHex(window.mod.intersected.currentHex);
+            window.mod.intersected = null;
+        }
     }
 
     addControls() {
@@ -594,6 +829,9 @@ class Mod {
         this.gui.domElement.id = 'gui'
         
         let options = {rotation: 0}
+        options.json = (() => this.jsonInput())
+        options.file = (() => this.jsonInput(true))
+        options.textGen = (() => this.textToObjects())
         options.create = (() => this.copyObjects(false, true))
         options.stop = (() => this.stopGrouping())
         options.stopAll = (() => this.stopGrouping(true))
@@ -619,6 +857,10 @@ class Mod {
         options.gridOpacity = this.settings.gridOpacity
         options.gridDivisions = this.settings.gridDivisions
         options.gridSize = this.settings.gridSize
+        options.voxelConvert = (() => this.convert()) 
+        options.voxelImport = (() => this.convert(true)) 
+        options.editColor = (() => this.editGroup('color', prompt("Input color", "")))
+        options.objectHighlight = this.settings.objectHighlight
         
         this.mainMenu = this.gui.addFolder("Map Editor Mod v" + this.version)
         this.mainMenu.open()
@@ -626,11 +868,15 @@ class Mod {
         this.assetMenu = this.mainMenu.addFolder("Assets")
         let assets = localStorage.getItem('krunk_assets') ? JSON.parse(localStorage.getItem('krunk_assets')) : {}
         
-        options.json = (() => this.jsonInput())
-        options.file = (() => this.jsonInput(true))
+        this.assetMenu.add(options, "rotation", 0, 359, 1).name("Rotation").onChange(t => {this.rotation = t})  
         this.assetMenu.add(options, "json").name("Json Import")
         this.assetMenu.add(options, "file").name("File Import")
-        this.assetMenu.add(options, "rotation", 0, 359, 1).name("Rotation").onChange(t => {this.rotation = t})  
+        this.assetMenu.add(options, "textGen").name("Text Generator")
+        
+        let voxelsMenu = this.assetMenu.addFolder('Voxels')
+        voxelsMenu.add(options, "voxelConvert").name("Convert")
+        voxelsMenu.add(options, "voxelImport").name("Import")
+        
         this.assetFolder(assets, this.assetMenu)
         
         let groupingMenu = this.mainMenu.addFolder("MultiObject")
@@ -643,19 +889,11 @@ class Mod {
         groupingMenu.add(options, "paste").name("Paste")
         
         let editMenu = groupingMenu.addFolder("Edit")
-        let textures = {
-            Default: "DEFAULT",
-            Wall: "WALL",
-            Dirt: "DIRT",
-            Floor: "FLOOR",
-            Grid: "GRID",
-            Grey: "GREY",
-            Roof: "ROOF",
-            Flag: "FLAG",
-        };
+        let textures = {Default: "DEFAULT", Wall: "WALL", Dirt: "DIRT", Floor: "FLOOR", Grid: "GRID", Grey: "GREY", Roof: "ROOF", Flag: "FLAG"};
         editMenu.add(options, "texture").options(textures).name("Texture").listen().onChange(t => {
             this.editGroup('texture', t);
         })
+        editMenu.add(options, "editColor").name("Color")
         
         let exportMenu = groupingMenu.addFolder("Export")
         
@@ -685,11 +923,12 @@ class Mod {
         settingsMenu.add(options, "backupMap").name("Auto Backup").onChange(t => {this.setSettings('backupMap', t)})
         settingsMenu.add(options, "antiAlias").name("Anti-aliasing").onChange(t => {this.setSettings('antiAlias', t), alert("This change will occur after you refresh")})      
         settingsMenu.add(options, "highPrecision").name("High Precision").onChange(t => {this.setSettings('highPrecision', t), alert("This change will occur after you refresh")}) 
+        settingsMenu.add(options, "objectHighlight").name("Hightlight").onChange(t => {this.setSettings('objectHighlight', t)}) 
 
         let gridMenu = settingsMenu.addFolder('Grid')
         gridMenu.add(options, "gridVisibility").name("Visible").onChange(t => {this.setSettings('gridVisibility', t)})      
         gridMenu.add(options, "gridOpacity", 0.05, 1, 0.05).name("Opacity").onChange(t => {this.setSettings('gridOpacity', t)})
-        gridMenu.add(options, "gridSize", 100, 1000, 50).name("Size").onChange(t => {this.setSettings('gridSize', t)})      
+        gridMenu.add(options, "gridSize").name("Size").onChange(t => {this.setSettings('gridSize', t)})      
         gridMenu.add(options, "gridDivisions").name("Divisions").onChange(t => {this.setSettings('gridDivisions', t)}) 
     }
     
@@ -736,9 +975,19 @@ GM_xmlhttpRequest({
             .replace(/antialias:!1/g, 'antialias:window.mod.settings.antiAlias ? 1 : !1')
             .replace(/precision:"mediump"/g, 'precision:window.mod.settings.highPrecision ? "highp": "mediump"')
             .replace(/GridHelper\(100,10\)/, 'GridHelper(window.mod.settings.gridSize, window.mod.settings.gridDivisions)')
+            
+            //Object Adding Optimization
             .replace(/addObject\((\w+)\){/, 'addObject($1, multi=false){')
             .replace(/(this\.scene\.add\(.+\.arrowHelper\)),(this\.attachTransform\(.+\.boundingMesh\))/, '$1; if(!multi)$2')
             .replace(/this\.addObject\((\w+\.deserialize\(\w+\))\);/, 'this.addObject($1, true);')
+        
+            //Object Removing Optimization
+            .replace(/removeObject\((\w+)\){/, 'removeObject($1, multi=false){')
+            .replace(/(this\.scene\.remove\(.+\.arrowHelper\)),(this\.hideTransform\(\))/, '$1; if(!multi)$2')
+            .replace(/(this\.removeObject\(this\.objInstances\[0\])\)/, '$1, true)')
+            .replace(/(},xyzKeys:)/, '\nthis.hideTransform();$1')
+            
+            .replace(/((this\.container\.addEventListener)\("mousedown")/, '$2("mousemove", window.mod.onMouseMove),$1')
             
         GM_xmlhttpRequest({
             method: "GET",
