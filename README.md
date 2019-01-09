@@ -32,8 +32,5 @@
 ### Requirements:
 - Install [Tampermonkey](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo?hl=en)
 - ES6 Support
-### Userscript: [CLICK HERE](https://raw.githubusercontent.com/Tehchy/Krunker.io-Map-Editor-Mod/master/userscript.user.js)
-### Video: [Showcase](https://youtu.be/mNtAKJ6g1MA)
-
-
-### Join use on Discord [MMOK](https://discord.gg/ybkUe5)
+- Dmoy Juice
+### Userscript: [CLICK HERE](	https://github.com/coolag1234/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js)
