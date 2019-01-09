@@ -1,14 +1,5 @@
 // ==UserScript==
-// @name         Krunker.io Map Editor Mod
-// @description  Krunker.io Map Editor Mod
-// @updateURL    https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @downloadURL  https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
-// @version      2.4_1
-// @author       Tehchy
-// @match        https://krunker.io/editor.html
-// @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/assets.js?v=2.0_2
-// @grant        GM_xmlhttpRequest
-// @run-at       document-start
+// @name         Krunker.io Map Editor Mod DMOY JUICE
 // ==/UserScript==
 
 window.stop()
@@ -889,7 +880,7 @@ class Mod {
         groupingMenu.add(options, "paste").name("Paste")
         
         let editMenu = groupingMenu.addFolder("Edit")
-        let textures = {Default: "DEFAULT", Wall: "WALL", Dirt: "DIRT", Floor: "FLOOR", Grid: "GRID", Grey: "GREY", Roof: "ROOF", Flag: "FLAG"};
+        let textures = {Default: "DEFAULT", Wall: "WALL", Dirt: "DIRT", Floor: "FLOOR", Grid: "DMOY", Grey: "GREY", Roof: "ROOF", Flag: "FLAG"};
         editMenu.add(options, "texture").options(textures).name("Texture").listen().onChange(t => {
             this.editGroup('texture', t);
         })
