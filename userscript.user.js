@@ -1,5 +1,14 @@
 // ==UserScript==
-// @name         Krunker.io Map Editor Mod DMOY JUICE
+// @name         Coolag's Mod Perms
+// @description  Mod Perms Userscript Written by Avery!
+// @updateURL    https://github.com/coolag1234/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
+// @downloadURL  https://github.com/coolag1234/Krunker.io-Map-Editor-Mod/raw/master/userscript.user.js
+// @version      4.2_0
+// @author       Coolag1234
+// @match        https://krunker.io/editor.html
+// @require      https://github.com/Tehchy/Krunker.io-Map-Editor-Mod/raw/master/assets.js?v=2.0_2
+// @grant        GM_xmlhttpRequest
+// @run-at       document-start
 // ==/UserScript==
 
 window.stop()
@@ -40,12 +49,12 @@ class Mod {
         let selected = this.hooks.editor.transformControl.object
         return selected ? (group ? (Object.keys(this.groups).includes(selected.uuid) ? selected : false) : selected) : false
     }
-    
+
     loadFile(callback, args = null) {
         let file = document.createElement('input')
         file.type = 'file'
         file.id = 'jsonInput'
-        
+
         let self = this
         file.addEventListener('change', ev => {
             if (ev.target.files.length != 1) return alert('Please select 1 file')
@@ -60,14 +69,14 @@ class Mod {
 
             reader.readAsText(f);
         }, false);
-        
+
         file.type = 'file'
         file.id = 'jsonInput'
         file.click()
-        
+
         return
     }
-    
+
     jsonInput(fromfile = false) {
         if (fromfile) {
             return this.loadFile('replaceObject', true);
@@ -84,26 +93,26 @@ class Mod {
         }
         if (selected) {
             if (!fix) this.hooks.editor.removeObject()
-            
+
             let jsp = JSON.parse(str);
             jsp = jsp.objects ? jsp.objects : jsp
-            
+
             let rotation = this.rotation;
             if (fix) {
                 this.hooks.gui.__folders["Object Config"].__controllers[1].setValue(false)
                 rotation = this.toDegree(selected.rotation.y) + 180
             }
-             
+
             if (rotation > 0) {
                 jsp = this.rotateObjects(jsp, rotation)
             }
-            
+
             let center = this.findCenter(jsp)
             for (let ob of jsp) {
                 ob.p[0] += selected.userData.owner.position.x - center[0]
                 ob.p[1] += selected.userData.owner.position.y - (selected.scale.y / 2) - center[1]
                 ob.p[2] += selected.userData.owner.position.z - center[2] - (fix ? 0.5 : 0)
-                
+
                 this.hooks.editor.addObject(this.hooks.objectInstance.deserialize(ob), skip)
             }
             this.rotation = 0
@@ -112,11 +121,11 @@ class Mod {
             alert("You must select a object first")
         }
     }
-    
+
     toRadians(angle) {
         return angle * (Math.PI / 180)
     }
-    
+
     toDegree(angle) {
       return angle * (180 / Math.PI)
     }
@@ -151,15 +160,15 @@ class Mod {
 
         return jsp
     }
-    
+
     getAngle(ob, live = false) {
         //Credit JustProb
         let x = live ? ob.x : ob.p[0],
             z = live ? ob.z : ob.p[2],
             angle =  Math.atan2(-1 * z, x)
         return angle < 0 ? angle + (Math.PI * 2) : angle
-    } 
-    
+    }
+
     changeAngle(jsp){
         //Credit JustProb
         for (let ob of jsp) {
@@ -172,7 +181,7 @@ class Mod {
             ob.p[0] = b
             ob.p[2] = a
         }
-        
+
         return jsp
     }
 
@@ -184,7 +193,7 @@ class Mod {
         }
         return jsp
     }
-    
+
     findCenter(jsp) {
         let min = jsp[0].p[1],
         xMin = jsp[0].p[0] - (jsp[0].s[0] /2),
@@ -203,7 +212,7 @@ class Mod {
 
         return [Math.round((xMin + xMax)/2), min, Math.round((yMin + yMax)/2)]
     }
-    
+
     applyCenter(objects) {
         let center = this.findCenter(objects);
         for(ob of objects){
@@ -212,44 +221,44 @@ class Mod {
             ob.p[2] -= center[2];
         }
     }
-    
+
     copyObjects(cut = false, group = false, ret = false) {
         let selected = this.objectSelected()
         if (!selected) return alert('Stretch a cube over your objects then try again')
         if (group && this.groups && Object.keys(this.groups).includes(selected.uuid)) return alert('You cant combine groups')
-        
+
         let pos = {
-            minX: selected.position.x - (selected.scale.x / 2), 
-            minY: selected.position.y, 
-            minZ: selected.position.z - (selected.scale.z / 2),  
-            maxX: selected.position.x + (selected.scale.x / 2), 
-            maxY: selected.position.y + selected.scale.y, 
-            maxZ: selected.position.z + (selected.scale.z / 2), 
+            minX: selected.position.x - (selected.scale.x / 2),
+            minY: selected.position.y,
+            minZ: selected.position.z - (selected.scale.z / 2),
+            maxX: selected.position.x + (selected.scale.x / 2),
+            maxY: selected.position.y + selected.scale.y,
+            maxZ: selected.position.z + (selected.scale.z / 2),
         }
         let intersect = []
         let obbys = []
         for (let ob of this.hooks.editor.objInstances) {
             if (ob.boundingMesh.uuid == selected.uuid) continue
             if (this.intersect({
-                    minX: ob.boundingMesh.position.x - (ob.boundingMesh.scale.x / 2), 
-                    minY: ob.boundingMesh.position.y, 
-                    minZ: ob.boundingMesh.position.z - (ob.boundingMesh.scale.z / 2), 
-                    maxX: ob.boundingMesh.position.x + (ob.boundingMesh.scale.x / 2), 
-                    maxY: ob.boundingMesh.position.y + ob.boundingMesh.scale.y, 
+                    minX: ob.boundingMesh.position.x - (ob.boundingMesh.scale.x / 2),
+                    minY: ob.boundingMesh.position.y,
+                    minZ: ob.boundingMesh.position.z - (ob.boundingMesh.scale.z / 2),
+                    maxX: ob.boundingMesh.position.x + (ob.boundingMesh.scale.x / 2),
+                    maxY: ob.boundingMesh.position.y + ob.boundingMesh.scale.y,
                     maxZ: ob.boundingMesh.position.z + (ob.boundingMesh.scale.z / 2)
                 }, pos)) {
                 if (!group) obbys.push(ob)
                 intersect.push(group ? ob.boundingMesh.uuid : ob.serialize())
             }
         }
-        
+
         if (!group) {
             if (cut && obbys.length && !group) {
                 for (var i = 0; i < obbys.length; i++) {
                     this.hooks.editor.removeObject(obbys[i])
                 }
             }
-            
+
             if (ret) {
                 return intersect
             } else {
@@ -260,28 +269,28 @@ class Mod {
             selected.userData.owner.opacity = 0.5
             selected.userData.owner.color = 0
             this.groups[selected.uuid] = {
-                owner: selected, 
-                pos: {x: selected.position.x, y: selected.position.y, z: selected.position.z}, 
+                owner: selected,
+                pos: {x: selected.position.x, y: selected.position.y, z: selected.position.z},
                 scale: {x: selected.scale.x, y: selected.scale.y, z: selected.scale.z},
                 objects: intersect
             }
         }
     }
-    
+
     exportObjects(full = false) {
         let obs = this.copyObjects(false, false, true)
         if (obs.length == 0) return alert('There was nothing to save')
         let nme = prompt("Name your asset", "");
         if (nme == null || nme == "") return alert('Please name your asset')
-            
+
         let center = this.findCenter(obs)
         for (let ob of obs) {
             ob.p[0] -= center[0]
             ob.p[1] -= center[1]
             ob.p[2] -= center[2]
         }
-    
-        if (full) 
+
+        if (full)
             obs = {
                 "name": "asset_" + nme.replace(/ /g,"_"),
                 "modURL":"https://www.dropbox.com/s/4j76kiqemdo6d9a/MMOKBill.zip?dl=0",
@@ -291,88 +300,88 @@ class Mod {
                 "fog":9280160,
                 "fogD":900,
                 "camPos":[0,0,0],
-                "spawns":[], 
+                "spawns":[],
                 "objects": obs
             }
         this.download(JSON.stringify(obs), 'asset_' + nme.replace(/ /g,"_") + '.txt', 'text/plain');
     }
-    
+
     pasteObjects() {
         if (!this.copy) return alert('Please copy objects first')
         if (!this.objectSelected()) return alert('Select a object you would like to replace with your copied objects')
         this.replaceObject(this.copy)
     }
-    
+
     removeGroup() {
         if (Object.keys(this.groups).length == 0) return
-        
+
         let selected = this.objectSelected(true)
-        if (!selected) return 
-        
+        if (!selected) return
+
         let remOb = []
-        
+
         this.groups[selected.uuid].objects.push(selected.uuid)
         let obs = this.hooks.editor.objInstances.filter(ob => this.groups[selected.uuid].objects.includes(ob.boundingMesh.uuid))
        /* for (var i = 0; i < this.hooks.editor.objInstances.length; i++) {
             if (!this.groups[selected.uuid].objects.includes(this.hooks.editor.objInstances[i].boundingMesh.uuid)) continue
-            
+
                 remOb.push(this.hooks.editor.objInstances[i])
         }*/
-            
+
         for (var i = 0; i < obs.length; i++)
             this.hooks.editor.removeObject(obs[i])
-        
+
         delete this.groups[selected.uuid]
     }
-    
+
     duplicateGroup() {
         if (Object.keys(this.groups).length == 0) return
 
         let selected = this.objectSelected(true)
         if (!selected) return alert('You cant duplicate a group that doesnt exist')
-            
+
         let group = this.groups[selected.uuid]
         let obs = this.hooks.editor.objInstances.filter(ob => group.objects.includes(ob.boundingMesh.uuid))
         let newObs = [];
-        
+
         for (let ob of obs) {
             let newOb = this.hooks.objectInstance.deserialize(ob.serialize())
             newObs.push(newOb.boundingMesh.uuid)
             this.hooks.editor.addObject(newOb)
         }
-        
+
         let groupBox = this.hooks.objectInstance.deserialize(selected.userData.owner.serialize())
         this.hooks.editor.addObject(groupBox)
-        
+
         selected = this.objectSelected()
         this.groups[selected.uuid] = {
-            owner: selected, 
+            owner: selected,
             pos: {x: selected.position.x, y: selected.position.y, z: selected.position.z},
             scale: {x: selected.scale.x, y: selected.scale.y, z: selected.scale.z},
             objects: newObs
         }
     }
-    
+
     checkGroup() {
         if (Object.keys(this.groups).length == 0) return
-        
+
         for (var uuid in this.groups) {
             let group = this.groups[uuid]
-            
+
             //Position Change Check
             let currPos = group.owner.position,
                 oldPos = group.pos,
                 diffPos = [currPos.x - oldPos.x, currPos.y - oldPos.y, currPos.z - oldPos.z],
                 changedPos = !(diffPos[0] === 0 && diffPos[1] === 0 && diffPos[2] === 0)
-            
+
             //Scale Change Check
             let currScale = group.owner.scale,
                 oldScale = group.scale,
                 diffScale = [(currScale.x / oldScale.x) , (currScale.y  / oldScale.y), (currScale.z / oldScale.z)],
                 changedScale = !(diffScale[0] === 1 && diffScale[1] === 1 && diffScale[2] === 1)
-                
+
             if (!changedPos && !changedScale) continue // no changes
-            
+
             let obs = this.hooks.editor.objInstances.filter(ob => group.objects.includes(ob.boundingMesh.uuid))
 
             for (let ob of obs) {
@@ -380,7 +389,7 @@ class Mod {
                     ob.boundingMesh.position.x *= diffScale[0]
                     ob.boundingMesh.position.y *= diffScale[1]
                     ob.boundingMesh.position.z *= diffScale[2]
-                    
+
                     ob.boundingMesh.scale.x *= diffScale[0]
                     ob.boundingMesh.scale.y *= diffScale[1]
                     ob.boundingMesh.scale.z *= diffScale[2]
@@ -390,15 +399,15 @@ class Mod {
                     ob.boundingMesh.position.z += diffPos[2]
                 }
             }
-            
+
             this.groups[group.owner.uuid].pos = {x: currPos.x, y: currPos.y, z: currPos.z}
             this.groups[group.owner.uuid].scale = {x: currScale.x, y: currScale.y, z: currScale.z}
         }
     }
-    
+
     stopGrouping(all = false) {
         if (Object.keys(this.groups).length == 0) return alert('You cant stop a group that doesnt exist')
-            
+
         if (all) {
             let obs = this.hooks.editor.objInstances.filter(ob => Object.keys(this.groups).includes(ob.boundingMesh.uuid))
             for (let ob of obs) {
@@ -408,12 +417,12 @@ class Mod {
         } else {
             let selected = this.objectSelected(true)
             if (!selected) return alert('You cant stop a group that doesnt exist')
-            
+
             delete this.groups[selected.uuid]
             return this.hooks.editor.removeObject(selected.userData.owner)
         }
     }
-    
+
     editGroup(change = 'texture', val = null) {
         if (Object.keys(this.groups).length == 0) return alert('You cant edit a group that doesnt exist')
         let selected = this.objectSelected(true)
@@ -425,11 +434,11 @@ class Mod {
             case 'color': for (let ob of obs) ob.color = val; break;
         }
     }
-    
+
     fixVehicle() {
         this.replaceObject('[{"p":[0,0,0],"s":[47,9,17],"v":1},{"p":[5,9,0],"s":[26,6,17],"v":1}]', false, true)
     }
-    
+
     spawnPlaceholder() {
         let pos = this.hooks.editor.camera.getWorldPosition()
         let obph = {p: [], s: [10, 10, 10], e: 16777215, o: 0.3, c: 0}
@@ -438,12 +447,12 @@ class Mod {
         obph.p[2] = pos.z
         this.hooks.editor.addObject(this.hooks.objectInstance.deserialize(obph))
     }
-    
+
     colorizeMap(input = false, gold = false, rand = false) {
         if (this.settings.backupMap) this.backupMap()
-        
+
         if (input != false && (input == null || input == "")) return alert("Please input colors (ex: #000000,#ffffff)")
-            
+
         if (input) input = input.trim().split(',')
 
         for (let ob of this.hooks.editor.objInstances) {
@@ -452,7 +461,7 @@ class Mod {
             if (rand) ob.color = this.getRandomColor()
         }
     }
-        
+
     getRandomColor() {
         let length = 6,
             chars = '0123456789ABCDEF',
@@ -460,17 +469,17 @@ class Mod {
         while (length--) hex += chars[(Math.random() * 16) | 0]
         return hex
     }
-    
+
     scaleMap() {
         if (this.settings.backupMap) this.backupMap()
-            
+
         let sX = this.mainMenu.__folders["Other Features"].__folders["Scale Map"].__controllers[0].getValue(),
             sY = this.mainMenu.__folders["Other Features"].__folders["Scale Map"].__controllers[1].getValue(),
             sZ = this.mainMenu.__folders["Other Features"].__folders["Scale Map"].__controllers[2].getValue()
-            
+
         for (let ob of this.hooks.editor.objInstances) {
             let pos = ob.pos, size = ob.size
-            
+
             pos[0] *= sX
             pos[1] *= sY
             pos[2] *= sZ
@@ -478,19 +487,19 @@ class Mod {
             size[0] *= sX
             size[1] *= sY
             size[2] *= sZ
-            
+
             ob.size = size
             ob.pos = pos
         }
     }
-  
+
     convertVoxel(str, insert = false) {
         if (insert && ! this.objectSelected()) return alert('Select a object to replace first')
         //try {
             let voxels = JSON.parse(str)
             let mapout = {"name":"modmap","modURL":"","ambient":9937064,"light":15923452,"sky":14477549,"fog":9280160,"fogD":900,"camPos":[0,0,0],"spawns":[],"objects":[]};
             let vlist = [];
-            for (let vx of voxels.voxels) 
+            for (let vx of voxels.voxels)
                 vlist.push([parseInt(vx.x), parseInt(vx.y), parseInt(vx.z)])
 
             vlist = vlist.sort((a, b) => {
@@ -501,7 +510,7 @@ class Mod {
                 return retVal;
             });
 
-            for (let voxel of vlist) 
+            for (let voxel of vlist)
                 mapout.objects.push(this.voxelToObject(voxel))
 
             mapout.objects = this.mergeVoxels(mapout.objects)
@@ -511,7 +520,7 @@ class Mod {
             //console.log(e);
             //alert("Failed to load voxels:\n" + e.toString());
         //}
-        
+
     }
 
     convert(insert = false) {
@@ -522,10 +531,10 @@ class Mod {
     voxelToObject(voxel) {
         return {
             'p': [
-                parseInt(voxel[0]) * this.voxelSize, 
-                parseInt(voxel[1]) * this.voxelSize, 
+                parseInt(voxel[0]) * this.voxelSize,
+                parseInt(voxel[1]) * this.voxelSize,
                 parseInt(voxel[2]) * this.voxelSize
-            ], 
+            ],
             's': [this.voxelSize, this.voxelSize, this.voxelSize]
         };
     }
@@ -589,7 +598,7 @@ class Mod {
                         objectsMerged++
                     } else
                         break;
-                    
+
                     searchPos += this.voxelSize
                     voxelFoward = this.searchObjects(objs, [obj.p[0], obj.p[1], searchPos])
                 }
@@ -619,13 +628,13 @@ class Mod {
                 min = guessIndex + 1
             }
             if(max < min) return -1;
-            
+
             guessIndex = parseInt((min + max) / 2);
             guessPos = objs[guessIndex].p;
         }
         return guessIndex;
     }
-    
+
     textToObjects() {
         let input = prompt("Input text", "");
         if (input != false && (input == null || input == "")) return alert("Please input proper text")
@@ -667,30 +676,30 @@ class Mod {
                 let asset = JSON.parse(JSON.stringify(alphabet[chr])); // Stop from editing alphabet assets
                 for (let ob of asset) {
                     ob.p[0] += posX;
-                    ob.p[1] += posY; 
+                    ob.p[1] += posY;
                     objects.push(ob);
                 }
-                posX += 9; 
+                posX += 9;
             }
         }
         //return objects;
         this.replaceObject(JSON.stringify(objects), true)
     }
-    
+
     transformMap() {
         return alert('This will be functional in a later update')
     }
-    
+
     backupMap() {
         return this.hooks.editor.exportMap()
     }
-        
+
     intersect(a, b) {
         return (a.minX <= b.maxX && a.maxX >= b.minX) &&
             (a.minY <= b.maxY && a.maxY >= b.minY) &&
             (a.minZ <= b.maxZ && a.maxZ >= b.minZ);
     }
-    
+
     onMouseMove(event) {
         if (!window.mod.settings.objectHighlight) {
             if (window.mod.intersected) {
@@ -721,13 +730,13 @@ class Mod {
         document.getElementById("exportMap").insertAdjacentHTML('afterend', '<div id="newMap" class="bottomButton">New Map</div>');
         document.getElementById("bottomBar").insertAdjacentHTML('beforeend', '<div class="bottomPanel"><div id="spawnPlaceholder" class="bottomButton">Spawn Placeholder</div></div>');
 
-        document.getElementById("newMap").addEventListener("click", t => {  
+        document.getElementById("newMap").addEventListener("click", t => {
             confirm("Are you sure you want to reset the map?") && this.hooks.editor.clearMap()
         })
-        document.getElementById("spawnPlaceholder").addEventListener("click", t => {  
+        document.getElementById("spawnPlaceholder").addEventListener("click", t => {
             this.spawnPlaceholder()
         })
-        
+
         window.addEventListener("keydown", t => {
             if (!this.hooks.editor.isTyping(t))
                 switch (t.keyCode) {
@@ -739,12 +748,12 @@ class Mod {
                         return t.shiftKey ? this.fixVehicle() : false
                     case 82:
                         return t.shiftKey ? this.hooks.editor.duplicateObject() : false
-                    case 80: 
+                    case 80:
                         return this.spawnPlaceholder()
                 }
         })
     }
-    
+
     download(content, fileName, contentType) {
         //Credit to - https://stackoverflow.com/a/34156339
         let a = document.createElement("a");
@@ -753,7 +762,7 @@ class Mod {
         a.download = fileName;
         a.click();
     }
-    
+
     degToRad(r) {
         if (!this.settings.degToRad) return r
         return [
@@ -762,7 +771,7 @@ class Mod {
             r[2] * (Math.PI / 180),
         ]
     }
-    
+
 	addStyle(css) {
 		let head = document.head || document.getElementsByTagName('head')[0]
 		if (head) {
@@ -772,10 +781,10 @@ class Mod {
 			head.appendChild(style)
 		}
 	}
-    
+
     loop() {
         this.checkGroup()
-        
+
         this.hooks.editor.gridHelper.visible = this.settings.gridVisibility;
         this.hooks.editor.gridHelper.material.opacity = this.settings.gridOpacity;
     }
@@ -783,7 +792,7 @@ class Mod {
     removeAd() {//Sorry Sidney it blocks my second GUI
         document.body.removeChild(document.body.children[0])
     }
-    
+
     setupSettings() {
         let ls = this.getSavedVal('krunker_editor_mod')
         if (ls == null) return
@@ -797,17 +806,17 @@ class Mod {
             this.settings[set] = jsp[set]
         }
     }
-    
+
     setSettings(k, v) {
         this.settings[k] = v
         this.saveVal('krunker_editor_mod', JSON.stringify(this.settings))
     }
-    
+
     getSavedVal(t) {
         const r = "undefined" != typeof Storage;
         return r ? localStorage.getItem(t) : null
     }
-    
+
     saveVal(t, e) {
         const r = "undefined" != typeof Storage;
         r && localStorage.setItem(t, e)
@@ -815,10 +824,10 @@ class Mod {
 
     addGui() {
         this.addStyle(`#gui { position: absolute; top: 2px; left: 2px }`)
-        
+
         this.gui = new dat.GUI
         this.gui.domElement.id = 'gui'
-        
+
         let options = {rotation: 0}
         options.json = (() => this.jsonInput())
         options.file = (() => this.jsonInput(true))
@@ -838,8 +847,8 @@ class Mod {
         options.highPrecision = this.settings.highPrecision
         options.scaleMapX = 0
         options.scaleMapY = 0
-        options.scaleMapZ = 0      
-        options.scaleMap = (() => this.scaleMap())    
+        options.scaleMapZ = 0
+        options.scaleMap = (() => this.scaleMap())
         options.transformMap = (() => this.transformMap())
         options.colorizeR = (() => this.colorizeMap(false, false, true))
         options.colorizeG = (() => this.colorizeMap(false, true))
@@ -848,81 +857,81 @@ class Mod {
         options.gridOpacity = this.settings.gridOpacity
         options.gridDivisions = this.settings.gridDivisions
         options.gridSize = this.settings.gridSize
-        options.voxelConvert = (() => this.convert()) 
-        options.voxelImport = (() => this.convert(true)) 
+        options.voxelConvert = (() => this.convert())
+        options.voxelImport = (() => this.convert(true))
         options.editColor = (() => this.editGroup('color', prompt("Input color", "")))
         options.objectHighlight = this.settings.objectHighlight
-        
-        this.mainMenu = this.gui.addFolder("Map Editor Mod v" + this.version)
+
+        this.mainMenu = this.gui.addFolder("Coolag's Mod Perms v" + this.version)
         this.mainMenu.open()
-        
+
         this.assetMenu = this.mainMenu.addFolder("Assets")
         let assets = localStorage.getItem('krunk_assets') ? JSON.parse(localStorage.getItem('krunk_assets')) : {}
-        
-        this.assetMenu.add(options, "rotation", 0, 359, 1).name("Rotation").onChange(t => {this.rotation = t})  
+
+        this.assetMenu.add(options, "rotation", 0, 359, 1).name("Rotation").onChange(t => {this.rotation = t})
         this.assetMenu.add(options, "json").name("Json Import")
         this.assetMenu.add(options, "file").name("File Import")
         this.assetMenu.add(options, "textGen").name("Text Generator")
-        
+
         let voxelsMenu = this.assetMenu.addFolder('Voxels')
         voxelsMenu.add(options, "voxelConvert").name("Convert")
         voxelsMenu.add(options, "voxelImport").name("Import")
-        
+
         this.assetFolder(assets, this.assetMenu)
-        
+
         let groupingMenu = this.mainMenu.addFolder("MultiObject")
         groupingMenu.open()
-        groupingMenu.add(options, "create").name("Create Group") 
-        groupingMenu.add(options, "stop").name("Stop Group") 
-        groupingMenu.add(options, "stopAll").name("Stop All Groups") 
+        groupingMenu.add(options, "create").name("Create Group")
+        groupingMenu.add(options, "stop").name("Stop Group")
+        groupingMenu.add(options, "stopAll").name("Stop All Groups")
         groupingMenu.add(options, "copy").name("Copy")
         groupingMenu.add(options, "cut").name("Cut")
         groupingMenu.add(options, "paste").name("Paste")
-        
+
         let editMenu = groupingMenu.addFolder("Edit")
-        let textures = {Default: "DEFAULT", Wall: "WALL", Dirt: "DIRT", Floor: "FLOOR", Grid: "DMOY", Grey: "GREY", Roof: "ROOF", Flag: "FLAG"};
+        let textures = {Default: "DEFAULT", Wall: "WALL", Dirt: "DIRT", Floor: "FLOOR", Grid: "GRID", Grey: "GREY", Roof: "ROOF", Flag: "FLAG"};
         editMenu.add(options, "texture").options(textures).name("Texture").listen().onChange(t => {
             this.editGroup('texture', t);
         })
         editMenu.add(options, "editColor").name("Color")
-        
+
         let exportMenu = groupingMenu.addFolder("Export")
-        
-        exportMenu.add(options, "exportObj").name("Objects") 
-        exportMenu.add(options, "exportFull").name("Full")         
-        
+
+        exportMenu.add(options, "exportObj").name("Objects")
+        exportMenu.add(options, "exportFull").name("Full")
+
         let otherMenu = this.mainMenu.addFolder("Other Features")
-        
+
         let colorizeMenu = otherMenu.addFolder("Colorize")
-        colorizeMenu.add(options, "colorizeR").name("Random") 
-        colorizeMenu.add(options, "colorizeG").name("Gold") 
-        colorizeMenu.add(options, "colorizeI").name("Input") 
-        
+        colorizeMenu.add(options, "colorizeR").name("Random")
+        colorizeMenu.add(options, "colorizeG").name("Gold")
+        colorizeMenu.add(options, "colorizeI").name("Input")
+
         let scaleMapMenu = otherMenu.addFolder("Scale Map")
-        scaleMapMenu.add(options, "scaleMapX").name("X") 
-        scaleMapMenu.add(options, "scaleMapY").name("Y") 
-        scaleMapMenu.add(options, "scaleMapZ").name("Z") 
+        scaleMapMenu.add(options, "scaleMapX").name("X")
+        scaleMapMenu.add(options, "scaleMapY").name("Y")
+        scaleMapMenu.add(options, "scaleMapZ").name("Z")
         scaleMapMenu.add(options, "scaleMap").name("Scale")
-        
+
         /*
         let transformMenu = otherMenu.addFolder("Transform Map")
         transformMenu.add(options, "transformMap").name("Transform")
         */
-        
+
         let settingsMenu = this.mainMenu.addFolder('Settings')
-        settingsMenu.add(options, "degToRad").name("Anti Radians").onChange(t => {this.setSettings('degToRad', t)})      
+        settingsMenu.add(options, "degToRad").name("Anti Radians").onChange(t => {this.setSettings('degToRad', t)})
         settingsMenu.add(options, "backupMap").name("Auto Backup").onChange(t => {this.setSettings('backupMap', t)})
-        settingsMenu.add(options, "antiAlias").name("Anti-aliasing").onChange(t => {this.setSettings('antiAlias', t), alert("This change will occur after you refresh")})      
-        settingsMenu.add(options, "highPrecision").name("High Precision").onChange(t => {this.setSettings('highPrecision', t), alert("This change will occur after you refresh")}) 
-        settingsMenu.add(options, "objectHighlight").name("Hightlight").onChange(t => {this.setSettings('objectHighlight', t)}) 
+        settingsMenu.add(options, "antiAlias").name("Anti-aliasing").onChange(t => {this.setSettings('antiAlias', t), alert("This change will occur after you refresh")})
+        settingsMenu.add(options, "highPrecision").name("High Precision").onChange(t => {this.setSettings('highPrecision', t), alert("This change will occur after you refresh")})
+        settingsMenu.add(options, "objectHighlight").name("Hightlight").onChange(t => {this.setSettings('objectHighlight', t)})
 
         let gridMenu = settingsMenu.addFolder('Grid')
-        gridMenu.add(options, "gridVisibility").name("Visible").onChange(t => {this.setSettings('gridVisibility', t)})      
+        gridMenu.add(options, "gridVisibility").name("Visible").onChange(t => {this.setSettings('gridVisibility', t)})
         gridMenu.add(options, "gridOpacity", 0.05, 1, 0.05).name("Opacity").onChange(t => {this.setSettings('gridOpacity', t)})
-        gridMenu.add(options, "gridSize").name("Size").onChange(t => {this.setSettings('gridSize', t)})      
-        gridMenu.add(options, "gridDivisions").name("Divisions").onChange(t => {this.setSettings('gridDivisions', t)}) 
+        gridMenu.add(options, "gridSize").name("Size").onChange(t => {this.setSettings('gridSize', t)})
+        gridMenu.add(options, "gridDivisions").name("Divisions").onChange(t => {this.setSettings('gridDivisions', t)})
     }
-    
+
     assetFolder(assets, menu) {
         let options = {}
         for (let ob in assets) {
@@ -935,7 +944,7 @@ class Mod {
             }
         }
     }
-    
+
     onLoad() {
         this.setupSettings()
         this.removeAd()
@@ -966,20 +975,20 @@ GM_xmlhttpRequest({
             .replace(/antialias:!1/g, 'antialias:window.mod.settings.antiAlias ? 1 : !1')
             .replace(/precision:"mediump"/g, 'precision:window.mod.settings.highPrecision ? "highp": "mediump"')
             .replace(/GridHelper\(100,10\)/, 'GridHelper(window.mod.settings.gridSize, window.mod.settings.gridDivisions)')
-            
+
             //Object Adding Optimization
             .replace(/addObject\((\w+)\){/, 'addObject($1, multi=false){')
             .replace(/(this\.scene\.add\(.+\.arrowHelper\)),(this\.attachTransform\(.+\.boundingMesh\))/, '$1; if(!multi)$2')
             .replace(/this\.addObject\((\w+\.deserialize\(\w+\))\);/, 'this.addObject($1, true);')
-        
+
             //Object Removing Optimization
             .replace(/removeObject\((\w+)\){/, 'removeObject($1, multi=false){')
             .replace(/(this\.scene\.remove\(.+\.arrowHelper\)),(this\.hideTransform\(\))/, '$1; if(!multi)$2')
             .replace(/(this\.removeObject\(this\.objInstances\[0\])\)/, '$1, true)')
             .replace(/(},xyzKeys:)/, '\nthis.hideTransform();$1')
-            
+
             .replace(/((this\.container\.addEventListener)\("mousedown")/, '$2("mousemove", window.mod.onMouseMove),$1')
-            
+
         GM_xmlhttpRequest({
             method: "GET",
             url: "https://krunker.io/editor.html",
